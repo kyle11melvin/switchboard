@@ -112,8 +112,7 @@ select.inline { border-radius: var(--pill); padding: 6px 12px; font-size: 0.8125
 /* Brief header: the label folds the brief open and shut; Discard sits beside it, not inside it. */
 .briefhead { flex-wrap: nowrap; }
 .brieftoggle { min-height: 28px; flex: 1; min-width: 0; display: flex; align-items: center; padding: 0; border: 0; border-radius: 6px; background: none; text-align: left; }
-.brieftoggle .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.brieftoggle[aria-expanded="false"] .lbl::after { content: " · tap to expand"; text-transform: none; letter-spacing: 0; font-weight: 600; }
+.brieftoggle .lbl { flex: 1; min-width: 0; white-space: normal; } /* wraps on narrow phones; never cut off */
 
 /* Buttons */
 button { cursor: pointer; border-radius: var(--r-sm); border: 1px solid transparent; padding: 11px 16px; font-weight: 700; transition: transform 0.05s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease; }
@@ -126,6 +125,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 @media (hover: hover) { .ghost:hover:not(:disabled) { border-color: var(--gold); } }
 .small { padding: 6px 12px; font-size: 0.8125rem; }
 .danger { color: var(--red); margin-top: 8px; }
+.primary.small { flex: none; min-width: 0; }
+
+/* Asking before something is deleted, in place */
+.confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 0.875rem; animation: settle 160ms ease-out backwards; }
+.confirm span { flex: 1 1 180px; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.confirm .danger { margin-top: 0; border-color: rgba(var(--red-rgb), 0.55); }
+
+/* New project form */
+.newproject input { flex: 1 1 130px; min-width: 0; background: var(--bg2); border: 1px solid var(--field-line); border-radius: var(--r-sm); padding: 10px 12px; font-size: max(16px, 1rem); }
+.newproject .row { margin-top: 10px; }
+.newproject { animation: open 200ms var(--ease-out) backwards; }
 
 /* Chips: task types, image styles, AIs */
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
@@ -345,7 +355,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
   /* No movement: reveals become short fades, the loading shimmer becomes a slow pulse, presses don't shift. */
   .best { animation: settle 200ms ease-out backwards; }
   .best::before { animation: none; }
-  .lockeditor, .briefpanel, .panel[aria-label="History"] { animation-name: settle; }
+  .lockeditor, .briefpanel, .newproject, .panel[aria-label="History"] { animation-name: settle; }
   .skeleton span { background: var(--line); animation: breathe 1.6s ease-in-out infinite alternate; }
   button:active:not(:disabled) { transform: none; }
   .knob { transition: none; }

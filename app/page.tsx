@@ -81,6 +81,8 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>(DEFAULT_PROJECTS);
   const [projectId, setProjectId] = useState("none");
   const [editingProject, setEditingProject] = useState(false);
+  const [naming, setNaming] = useState(false); // the "new project" form is showing
+  const [newName, setNewName] = useState("");
 
   const [idea, setIdea] = useState("");
   const [preset, setPreset] = useState<Preset>(PRESETS[1]);
@@ -147,6 +149,14 @@ export default function Home() {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
   function updateProjects(next: Project[]) { setProjects(next); if (!save(LS.projects, next)) setErr(STORAGE_FULL); }
+  function createProject(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newName.trim().slice(0, 60);
+    if (!name) return;
+    const np = { id: uid(), name, locked: "" };
+    updateProjects([...projects, np]); chooseProject(np.id);
+    setNaming(false); setNewName(""); setEditingProject(true);
+  }
   function chooseProject(id: string) { setProjectId(id); save(LS.project, id); }
 
   async function sharpen() {
@@ -244,7 +254,7 @@ export default function Home() {
       <header className="top">
         <h1 className="brand">Switchboard<span>one idea · every AI · one verdict</span></h1>
         <div className="topright">
-          <select className="projpill" aria-label="Project" value={projectId} onChange={(e) => { const v = e.target.value; if (v === "__new") { const name = prompt("Project name?")?.trim().slice(0, 60); if (!name) return; const np = { id: uid(), name, locked: "" }; updateProjects([...projects, np]); chooseProject(np.id); setEditingProject(true); } else { chooseProject(v); setEditingProject(false); } }}>
+          <select className="projpill" aria-label="Project" value={projectId} onChange={(e) => { const v = e.target.value; if (v === "__new") { setNaming(true); } else { setNaming(false); chooseProject(v); setEditingProject(false); } }}>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             <option value="__new">+ New project…</option>
           </select>
@@ -270,12 +280,24 @@ export default function Home() {
             </button>
           ))}
           {history.length > 0 && (
-            <button className="ghost small" onClick={() => { if (confirm("Clear all history?")) { setHistory([]); save(LS.history, []); } }}>Clear history</button>
+            <ConfirmButton label="Clear history" question="Clear all history?" yes="Clear" no="Keep" onYes={() => { setHistory([]); save(LS.history, []); }} />
           )}
         </section>
       )}
 
-      {project?.id !== "none" && (
+      {naming && (
+        <form className="panel newproject" onSubmit={createProject}>
+          <label className="lbl" htmlFor="newproject">New project</label>
+          <div className="row">
+            <input id="newproject" autoFocus maxLength={60} value={newName} placeholder="Project name" autoComplete="off"
+              onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { setNaming(false); setNewName(""); } }} />
+            <button className="primary small" disabled={!newName.trim()}>Create</button>
+            <button type="button" className="ghost small" onClick={() => { setNaming(false); setNewName(""); }}>Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {project?.id !== "none" && !naming && (
         <section className="lockbar">
           <button className="lockline" aria-expanded={editingProject} onClick={() => setEditingProject((v) => !v)}>
             <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
@@ -287,10 +309,8 @@ export default function Home() {
               <textarea rows={6} value={project.locked} aria-label={`Locked decisions for ${project.name}, one per line`}
                 placeholder={"One per line. Every model and the judge treat these as settled.\ne.g. Single-file HTML, no framework\ne.g. Brand colors navy #1B2A4A / gold #C9A84C"}
                 onChange={(e) => updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: e.target.value } : p)))} />
-              <button className="ghost small danger" onClick={() => {
-                if (!confirm(`Delete project "${project.name}"?`)) return;
-                updateProjects(projects.filter((p) => p.id !== project.id)); chooseProject("none"); setEditingProject(false);
-              }}>Delete project</button>
+              <ConfirmButton danger label="Delete project" question={`Delete “${project.name}” and its locked decisions?`} yes="Delete" no="Keep"
+                onYes={() => { updateProjects(projects.filter((p) => p.id !== project.id)); chooseProject("none"); setEditingProject(false); }} />
             </div>
           )}
         </section>
@@ -345,7 +365,7 @@ export default function Home() {
         <section className="panel briefpanel">
           <div className="row briefhead">
             <button className="brieftoggle" aria-expanded={briefOpen} aria-controls="brief" onClick={() => setBriefOpen((v) => !v)}>
-              <span className="lbl">Brief · edit freely, this is what gets sent</span>
+              <span className="lbl">{briefOpen ? "Brief · this is what gets sent" : "Brief · tap to open"}</span>
             </button>
             <button className="ghost small" onClick={() => setBrief("")}>Discard</button>
           </div>
@@ -497,6 +517,19 @@ function PresetIcon({ id }: { id: string }) {
 // Three grey lines standing in for text that's on its way.
 function Skeleton() {
   return <div className="skeleton" aria-hidden="true"><span /><span /><span /></div>;
+}
+
+// A destructive action asks once, in place, instead of through a browser pop-up.
+function ConfirmButton({ label, question, yes, no, danger, onYes }: { label: string; question: string; yes: string; no: string; danger?: boolean; onYes: () => void }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) return <button className={`ghost small ${danger ? "danger" : ""}`} onClick={() => setAsking(true)}>{label}</button>;
+  return (
+    <div className="confirm" role="group" aria-label={question} onKeyDown={(e) => { if (e.key === "Escape") setAsking(false); }}>
+      <span>{question}</span>
+      <button className="ghost small danger" onClick={() => { setAsking(false); onYes(); }}>{yes}</button>
+      <button className="ghost small" autoFocus onClick={() => setAsking(false)}>{no}</button>
+    </div>
+  );
 }
 
 function CopyBtn({ text, label }: { text: string; label: string }) {

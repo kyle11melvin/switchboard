@@ -20,6 +20,7 @@ One idea → sharpened brief → pick your AIs → side-by-side answers → one 
 | Variable | Where to get it |
 |---|---|
 | `APP_PASSWORD` | Make one up. Login page, remembered 90 days. **Set this** or anyone with the URL spends your credits. |
+| `AUTH_SECRET` | A long random value that signs the login cookie. Make one with `openssl rand -hex 32`. Changing it signs every device out. |
 | `OPENAI_API_KEY` | platform.openai.com → API keys (separate from ChatGPT Plus) |
 | `ANTHROPIC_API_KEY` | console.anthropic.com |
 | `XAI_API_KEY` | console.x.ai (separate from SuperGrok) |
