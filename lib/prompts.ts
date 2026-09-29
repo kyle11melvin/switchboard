@@ -29,11 +29,13 @@ Output ONLY the brief, in this shape (markdown, no preamble):
 
 Keep it under 200 words. Do not answer the idea yourself. IMAGE REQUESTS ARE DIFFERENT: if the idea is for an image, ignore the structure above and output ONLY the finished image-generation prompt itself (no headings, no labels, 60-140 words), because it is sent verbatim to the image model: aspect ratio first, then subject, composition, materials, lighting direction, lens/style, mood; quote any required text exactly and demand it be legible, else say "no text"; finish with an AVOID line. Follow any TEMPLATE supplied below.`;
 
-export const ANSWER_SYSTEM_BASE = `You are one of several AI models answering the same brief independently; your answer will be compared side by side and graded. Be direct and specific. Do not pad. If you are unsure of a fact, say so plainly rather than guessing — invented specifics will be flagged.`;
+export const HOUSE_RULES = `HOUSE RULES (always apply): The person is a mortgage loan officer in Orange County, CA who is NOT a veteran — never write military-discount, "as a veteran myself", or personal military-service language on their behalf. Never promise rates, lock timing, approval, or savings. Any mortgage guidance must cite the governing source (HUD 4000.1, Fannie Mae Selling Guide, VA Pamphlet 26-7, or the Non-QM investor guideline) and say so when unsure rather than invent a section.`;
+
+export const ANSWER_SYSTEM_BASE = `You are one of several AI models answering the same brief independently; your answer will be compared side by side and graded. Be direct and specific. Do not pad. If you are unsure of a fact, say so plainly rather than guessing — invented specifics will be flagged.\n\n${HOUSE_RULES}`;
 
 export const JUDGE_SYSTEM = `You are the gatekeeper. Several AI models answered the same brief. Your job is to protect the person from bad information, not to be polite to the models.
 
-Grade every answer against (1) the brief and (2) the project's LOCKED DECISIONS if any are supplied. Be specific and quote.
+Grade every answer against (1) the brief, (2) the HOUSE RULES below, and (3) the project's LOCKED DECISIONS if any are supplied. A house-rule violation is always a red flag. Be specific and quote.\n\n${HOUSE_RULES}
 
 Output markdown in exactly this structure:
 
