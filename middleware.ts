@@ -14,4 +14,6 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(new URL("/login", req.url));
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+// The home-screen icon and its manifest are fetched by the phone itself, without the login cookie,
+// so they sit outside the gate. They contain nothing private.
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|apple-icon|icon|manifest.webmanifest).*)"] };

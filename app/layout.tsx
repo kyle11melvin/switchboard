@@ -24,9 +24,6 @@ function ownLogos(): string {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${fraunces.variable} ${manrope.variable}`} data-logos={ownLogos()}>
-      <head>
-        <link rel="apple-touch-icon" href="/icon.svg" />
-      </head>
       <body>{children}</body>
     </html>
   );
