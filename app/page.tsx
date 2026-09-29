@@ -59,6 +59,8 @@ async function api<T>(url: string, body?: unknown): Promise<T> {
   if (d === null) throw new Error("Got an unreadable reply from the server. Try again.");
   return d as T;
 }
+// Smooth scrolling is movement too: jump straight there for people who've asked for less motion.
+const scrollBehavior = (): ScrollBehavior => (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const DOMAIN: Record<ProviderId, string> = { openai: "openai.com", anthropic: "anthropic.com", xai: "x.ai", perplexity: "perplexity.ai", gemini: "gemini.google.com" };
@@ -202,7 +204,7 @@ export default function Home() {
     const id = uid(); setRunId(id); setRunPrompt(prompt); activeRun.current = id;
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 50);
 
     const finished = await Promise.all(targets.map((provider) => runOne(provider, prompt, id)));
 
@@ -222,7 +224,7 @@ export default function Home() {
     setIdea(h.idea); setBrief(h.brief === h.idea ? "" : h.brief); setMode(h.mode);
     setResults(Object.fromEntries(h.results.map((r) => [r.provider, r])));
     setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   }
 
   const sendable = selected.filter((s) => byId[s]?.configured);
@@ -241,7 +243,7 @@ export default function Home() {
             <option value="__new">+ New project…</option>
           </select>
           {Object.keys(results).length > 0 && (
-            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           )}
@@ -431,7 +433,7 @@ export default function Home() {
           {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen"}
         </button>
         <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={send}>
-          {running ? "Running…" : sendable.length ? (sendable.length > 2 ? `Send to ${sendable.length} AIs` : `Send to ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
+          {running ? `Running… ${done.length} of ${Object.keys(results).length} in` : sendable.length ? (sendable.length > 2 ? `Send to ${sendable.length} AIs` : `Send to ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
         </button>
       </div>
     </main>

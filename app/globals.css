@@ -280,3 +280,37 @@ main { padding-top: calc(14px + env(safe-area-inset-top)); padding-left: max(16p
 
 /* Optimize: a logo slot holds its space while the logo is being found */
 span.logo { display: inline-block; }
+
+/* Animate: motion is feedback here. One authored moment (the verdict landing); everything else is quick and quiet. */
+:root { --ease-out: cubic-bezier(0.16, 1, 0.3, 1); }
+button { transition: transform 0.05s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease; }
+
+/* The switch knob slides with transform instead of moving its left edge. */
+.knob { transition: transform 0.18s var(--ease-out); }
+.switch input:checked + .track .knob { left: 3px; transform: translateX(16px); }
+
+/* Focal moment: a gold line connects across the top, then the best answer unrolls beneath it. */
+.best { position: relative; animation: verdict-in 520ms var(--ease-out) backwards; }
+.best::before { content: ""; position: absolute; left: 12px; right: 12px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--gold), var(--gold2)); transform-origin: left center; opacity: 0; pointer-events: none; animation: verdict-line 760ms var(--ease-out) backwards; }
+@keyframes verdict-in { from { clip-path: inset(0 0 100% 0 round 12px); } to { clip-path: inset(0 0 0 0 round 12px); } }
+@keyframes verdict-line { 0% { transform: scaleX(0); opacity: 1; } 55% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+.grading { animation: settle 320ms ease-out 260ms backwards; }
+
+/* Continuity: answers fade in where their placeholder was; panels that open do so from the control that opened them. */
+.card > .md, .card > .imgwrap, .card > .cites, .card > .carderr { animation: settle 220ms ease-out backwards; }
+.lockeditor, .briefpanel, .panel[aria-label="History"] { animation: open 200ms var(--ease-out) backwards; }
+.error { animation: settle 160ms ease-out backwards; }
+@keyframes settle { from { opacity: 0; } }
+@keyframes open { from { opacity: 0; transform: translateY(-6px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* No movement: reveals become short fades, the loading shimmer becomes a slow pulse, presses don't shift. */
+  .best { animation: settle 200ms ease-out backwards; }
+  .best::before { animation: none; }
+  .lockeditor, .briefpanel, .panel[aria-label="History"] { animation-name: settle; }
+  .skeleton span { background: var(--line); animation: breathe 1.6s ease-in-out infinite alternate; }
+  button:active:not(:disabled) { transform: none; }
+  .knob { transition: none; }
+  .grading summary::before { transition: none; }
+}
+@keyframes breathe { from { opacity: 0.45; } to { opacity: 1; } }
