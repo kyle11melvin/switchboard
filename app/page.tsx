@@ -260,7 +260,7 @@ export default function Home() {
           {history.map((h) => (
             <button key={h.id} className="hist" onClick={() => openHistory(h)}>
               <span>{h.idea.trim().slice(0, 90) || h.brief.trim().slice(0, 90) || "Untitled run"}</span>
-              <small>{new Date(h.at).toLocaleString()} · {h.results.map((r) => label(r.provider)).join(", ")}{h.verdict ? " · judged" : ""}{h.projectName ? ` · ${h.projectName}` : ""}</small>
+              <small>{new Date(h.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · {h.results.map((r) => label(r.provider)).join(", ")}{h.verdict ? " · judged" : ""}{h.projectName ? ` · ${h.projectName}` : ""}</small>
             </button>
           ))}
           {history.length > 0 && (
@@ -298,7 +298,7 @@ export default function Home() {
 
         <div className="chips" role="group" aria-label="Task type">
           {PRESETS.map((p) => (
-            <button key={p.id} aria-pressed={preset.id === p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}>{p.label}{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
+            <button key={p.id} aria-pressed={preset.id === p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}><PresetLabel text={p.label} />{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
           ))}
         </div>
 
@@ -381,7 +381,7 @@ export default function Home() {
             <article key={pid} className="card" aria-label={label(pid as ProviderId)} aria-busy={r === "loading"}>
               <div className="cardhead">
                 <strong><Logo id={pid as ProviderId} />{label(pid as ProviderId)}</strong>
-                {r !== "loading" && <small>{r.model} · {(r.ms / 1000).toFixed(1)}s</small>}
+                {r !== "loading" && (r.model || r.ms > 0) && <small>{[r.model, r.ms > 0 && `${(r.ms / 1000).toFixed(1)}s`].filter(Boolean).join(" · ")}</small>}
                 {r !== "loading" && r.promptOnly && <span className="tag">prompt</span>}
                 {r !== "loading" && r.text && <CopyBtn text={r.text} label={r.promptOnly ? "Copy prompt" : "Copy"} />}
               </div>
@@ -417,7 +417,7 @@ export default function Home() {
       )}
 
       {providers.length > 0 && providers.every((p) => !p.configured) && (
-        <div className="error">No API keys found. Add them in Vercel → Settings → Environment Variables (see README), then redeploy.</div>
+        <div className="error" role="alert">No API keys found. Add them in Vercel → Settings → Environment Variables (see README), then redeploy.</div>
       )}
 
       {Object.keys(results).length === 0 && !brief && (
@@ -469,6 +469,14 @@ function Logo({ id }: { id: ProviderId }) {
   if (src === "") return <i className={`mono ${id}`}>{MONO[id]}</i>;
   if (src === null) return <span className="logo" aria-hidden="true" />;
   return <img className={`logo ${ok ? "ok" : ""}`} src={src} alt="" decoding="async" onLoad={() => setOk(true)} onError={() => setSrc("")} />;
+}
+
+// Preset labels start with an emoji ("🎨 Creative image"). Give it its own fixed-width slot so labels line up,
+// and keep it out of what screen readers announce.
+function PresetLabel({ text }: { text: string }) {
+  const i = text.indexOf(" ");
+  if (i < 1 || /^[\w(]/.test(text)) return <>{text}</>;
+  return <><span className="emo" aria-hidden="true">{text.slice(0, i)}</span>{text.slice(i + 1)}</>;
 }
 
 // Three grey lines standing in for text that's on its way.
