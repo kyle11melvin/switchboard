@@ -216,6 +216,8 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .sources .md li { margin: 2px 0; }
 .sources .md strong { color: var(--text); font-weight: 700; }
 .grading { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.ghost.wide { width: 100%; margin-bottom: 12px; }
+.answerstoggle { font-size: 0.875rem; color: var(--muted); }
 .grading summary { min-height: 28px; cursor: pointer; font-weight: 700; font-size: 0.8125rem; color: var(--muted); list-style: none; display: flex; align-items: center; gap: 8px; }
 .grading summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform 0.15s; }
 .grading[open] summary::before { transform: rotate(45deg); }

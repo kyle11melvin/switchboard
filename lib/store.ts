@@ -15,6 +15,9 @@ const token = () => process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_R
 
 export const storeConnected = () => Boolean(url() && token());
 
+// Every key starts with this. Tests set SYNC_PREFIX so they never touch real data.
+const K = (name: string) => `${process.env.SYNC_PREFIX || "sb"}:${name}`;
+
 type Cmd = (string | number)[];
 
 async function send(path: string, body: unknown): Promise<any> {
@@ -43,7 +46,8 @@ async function run(cmd: Cmd): Promise<any> {
 async function runAll(cmds: Cmd[]): Promise<any[]> {
   if (!cmds.length) return [];
   const d = await send("/pipeline", cmds);
-  if (!Array.isArray(d)) throw new Error("Sync storage gave an unexpected reply.");
+  // A command the storage doesn't know rejects the whole batch with a single error.
+  if (!Array.isArray(d)) throw new Error(d?.error ? `Sync storage: ${d.error}` : "Sync storage gave an unexpected reply.");
   return d.map((x) => { if (x?.error) throw new Error(`Sync storage: ${x.error}`); return x?.result; });
 }
 const parse = <T,>(s: unknown): T | null => { try { return typeof s === "string" ? (JSON.parse(s) as T) : null; } catch { return null; } };
@@ -53,13 +57,13 @@ const MAX_RUN_BYTES = 400_000;   // one run; keeps any single request well insid
 
 export async function readChanges(since: number) {
   const [projects, cleared, ids] = await runAll([
-    ["HVALS", "sb:projects"],
-    ["GET", "sb:clearedAt"],
-    ["ZRANGEBYSCORE", "sb:runs:seq", `(${since}`, "+inf", "WITHSCORES", "LIMIT", 0, PAGE],
+    ["HVALS", K("projects")],
+    ["GET", K("clearedAt")],
+    ["ZRANGEBYSCORE", K("runs:seq"), `(${since}`, "+inf", "WITHSCORES", "LIMIT", 0, PAGE],
   ]);
   const pairs: [string, number][] = [];
   for (let i = 0; i + 1 < (ids?.length ?? 0); i += 2) pairs.push([String(ids[i]), Number(ids[i + 1])]);
-  const raw: unknown[] = pairs.length ? await run(["HMGET", "sb:runs", ...pairs.map((p) => p[0])]) : [];
+  const raw: unknown[] = pairs.length ? await run(["HMGET", K("runs"), ...pairs.map((p) => p[0])]) : [];
   const runs = raw.map((r) => parse<SyncedRun>(r)).filter(isRun);
   const more = pairs.length === PAGE;
   return {
@@ -77,24 +81,24 @@ export async function writeChanges(input: { projects?: unknown[]; runs?: unknown
   const runs = (input.runs ?? []).filter(isRun).slice(0, 50);
   const askedClear = typeof input.clearedAt === "number" && input.clearedAt > 0 ? input.clearedAt : 0;
 
-  const storedClear = Number(await run(["GET", "sb:clearedAt"])) || 0;
+  const storedClear = Number(await run(["GET", K("clearedAt")])) || 0;
   const clearedAt = Math.max(storedClear, askedClear);
   const cmds: Cmd[] = [];
   let skipped = 0;
 
   if (projects.length) {
-    const have: unknown[] = await run(["HMGET", "sb:projects", ...projects.map((p) => p.id)]);
+    const have: unknown[] = await run(["HMGET", K("projects"), ...projects.map((p) => p.id)]);
     projects.forEach((p, i) => {
       const old = parse<SyncedProject>(have[i]);
       if (old && changedAt(old) >= changedAt(p)) return;
       const clean: SyncedProject = { id: p.id, name: p.name.slice(0, 60), locked: p.deleted ? "" : p.locked.slice(0, 20_000), updatedAt: changedAt(p), ...(p.deleted ? { deleted: true } : {}) };
-      cmds.push(["HSET", "sb:projects", p.id, JSON.stringify(clean)]);
+      cmds.push(["HSET", K("projects"), p.id, JSON.stringify(clean)]);
     });
   }
 
   const fresh = runs.filter((r) => r.at > clearedAt);
   if (fresh.length) {
-    const have: unknown[] = await run(["HMGET", "sb:runs", ...fresh.map((r) => r.id)]);
+    const have: unknown[] = await run(["HMGET", K("runs"), ...fresh.map((r) => r.id)]);
     const accepted: { r: SyncedRun; json: string }[] = [];
     fresh.forEach((r, i) => {
       const old = parse<SyncedRun>(have[i]);
@@ -104,29 +108,29 @@ export async function writeChanges(input: { projects?: unknown[]; runs?: unknown
       accepted.push({ r, json });
     });
     if (accepted.length) {
-      const last = Number(await run(["INCRBY", "sb:seq", accepted.length]));
+      const last = Number(await run(["INCRBY", K("seq"), accepted.length]));
       accepted.forEach(({ r, json }, i) => {
-        cmds.push(["HSET", "sb:runs", r.id, json]);
-        cmds.push(["ZADD", "sb:runs:seq", last - accepted.length + 1 + i, r.id]);
-        cmds.push(["ZADD", "sb:runs:at", r.at, r.id]);
+        cmds.push(["HSET", K("runs"), r.id, json]);
+        cmds.push(["ZADD", K("runs:seq"), last - accepted.length + 1 + i, r.id]);
+        cmds.push(["ZADD", K("runs:at"), r.at, r.id]);
       });
     }
   }
-  if (clearedAt > storedClear) cmds.push(["SET", "sb:clearedAt", clearedAt]);
+  if (clearedAt > storedClear) cmds.push(["SET", K("clearedAt"), clearedAt]);
   await runAll(cmds);
 
   // Housekeeping: drop what a "clear history" covers, then anything past the limit, oldest first.
   const [cleared, count] = await runAll([
-    ["ZRANGEBYSCORE", "sb:runs:at", "-inf", clearedAt],
-    ["ZCARD", "sb:runs:at"],
+    ["ZRANGEBYSCORE", K("runs:at"), "-inf", clearedAt],
+    ["ZCARD", K("runs:at")],
   ]);
   let gone: string[] = (cleared as string[]) ?? [];
   const extra = Number(count) - gone.length - HISTORY_LIMIT;
   if (extra > 0) {
-    const oldest: string[] = await run(["ZRANGEBYSCORE", "sb:runs:at", `(${clearedAt}`, "+inf", "LIMIT", 0, extra]);
+    const oldest: string[] = await run(["ZRANGEBYSCORE", K("runs:at"), `(${clearedAt}`, "+inf", "LIMIT", 0, extra]);
     gone = gone.concat(oldest ?? []);
   }
-  if (gone.length) await runAll([["HDEL", "sb:runs", ...gone], ["ZREM", "sb:runs:seq", ...gone], ["ZREM", "sb:runs:at", ...gone]]);
+  if (gone.length) await runAll([["HDEL", K("runs"), ...gone], ["ZREM", K("runs:seq"), ...gone], ["ZREM", K("runs:at"), ...gone]]);
 
   return { clearedAt, skipped };
 }

@@ -57,7 +57,8 @@ Points most models converge on (higher confidence).
 Real disagreements and which side is better supported.
 
 ## Best combined answer
-A new answer, better than any single one: merge the strongest parts of every answer and drop anything flagged. Do not copy one answer and lightly edit it unless the others truly add nothing. This is what the person will actually use, so make it complete and ready to use. Do not mention the answers or their labels inside it.
+A new answer, better than any single one: merge the strongest parts of every answer and drop anything flagged. Do not copy one answer and lightly edit it unless the others truly add nothing. This is the only part the person reads, so make it complete and ready to use.
+Give ONE answer, not a menu. If the answers offered several options or versions, choose the strongest or merge them into one, unless the brief itself asks for multiple options. No preamble, no notes about tone or how to pick, no recap of what you did. Keep it as short as the deliverable allows. Do not mention the answers or their labels inside it.
 
 ## Built from
 One short bullet per answer saying what the combined answer took from it, or "Nothing used" with the reason. Be specific: name the part.`;

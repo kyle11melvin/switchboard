@@ -105,6 +105,7 @@ export default function Home() {
 
   const [brief, setBrief] = useState("");
   const [briefing, setBriefing] = useState(false);
+  const [showAnswers, setShowAnswers] = useState(false); // individual answers, once a verdict has replaced them
   const [briefOpen, setBriefOpen] = useState(true); // folds away once answers arrive, so the verdict is what you see
   const [results, setResults] = useState<Record<string, RunResult | "loading">>({});
   const [verdict, setVerdict] = useState("");
@@ -239,7 +240,7 @@ export default function Home() {
     const targets = selected.filter((s) => byId[s]?.configured);
     // Cmd+Enter lands here too, so guard against a second run while one is in flight.
     if (!prompt || !targets.length || running) return;
-    setErr(""); setVerdict(""); setBriefOpen(false);
+    setErr(""); setVerdict(""); setBriefOpen(false); setShowAnswers(false);
     const id = uid(); setRunId(id); setRunPrompt(prompt); activeRun.current = id;
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
@@ -264,13 +265,14 @@ export default function Home() {
   function openHistory(h: HistoryItem) {
     setIdea(h.idea); setBrief(h.brief === h.idea ? "" : h.brief); setMode(h.mode);
     setResults(Object.fromEntries(h.results.map((r) => [r.provider, r])));
-    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false);
+    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false); setShowAnswers(false);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
   }
 
   const sendable = selected.filter((s) => byId[s]?.configured);
   const done = Object.values(results).filter((r) => r !== "loading") as RunResult[];
   const running = Object.values(results).some((r) => r === "loading");
+  const failedCount = done.filter((r) => r.error).length;
   const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
 
@@ -423,14 +425,15 @@ export default function Home() {
             return (
               <>
                 <div className="best md"><Markdown text={best} /></div>
-                {sources && (
-                  <div className="sources">
-                    <h3 className="lbl">Built from</h3>
-                    <div className="md"><Markdown text={sources} /></div>
-                  </div>
-                )}
-                <details className="grading" open={flags > 0}>
-                  <summary>{flags > 0 ? `${flags} red flag${flags === 1 ? "" : "s"} · ` : ""}Scorecard &amp; how they compared</summary>
+                {/* The answer is the point. How it was reached stays folded until asked for. */}
+                <details className="grading">
+                  <summary>{flags > 0 ? `${flags} red flag${flags === 1 ? "" : "s"} caught · ` : ""}How this was judged</summary>
+                  {sources && (
+                    <div className="sources">
+                      <h3 className="lbl">Built from</h3>
+                      <div className="md"><Markdown text={sources} /></div>
+                    </div>
+                  )}
                   <div className="md"><Markdown text={rest} /></div>
                 </details>
               </>
@@ -442,7 +445,14 @@ export default function Home() {
         <button className="primary wide" onClick={() => judge(done, (brief || idea).trim(), runId ?? uid())}>Judge these answers</button>
       )}
 
-      {Object.keys(results).length > 0 && (
+      {/* Once there's a verdict, the individual answers step back behind one button. */}
+      {Object.keys(results).length > 0 && verdict && !judging && (
+        <button className="ghost wide answerstoggle" aria-expanded={showAnswers} onClick={() => setShowAnswers((v) => !v)}>
+          {showAnswers ? "Hide" : "Show"} the {done.length} individual answer{done.length === 1 ? "" : "s"}{failedCount > 0 ? ` (${failedCount} failed)` : ""}
+        </button>
+      )}
+
+      {Object.keys(results).length > 0 && (!verdict || judging || showAnswers) && (
         <section className={`grid n${Object.keys(results).length}`}>
           {Object.entries(results).map(([pid, r]) => (
             <article key={pid} className="card" aria-busy={r === "loading"}>
