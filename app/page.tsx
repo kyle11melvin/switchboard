@@ -386,9 +386,9 @@ export default function Home() {
       {Object.keys(results).length > 0 && (
         <section className={`grid n${Object.keys(results).length}`}>
           {Object.entries(results).map(([pid, r]) => (
-            <article key={pid} className="card" aria-label={label(pid as ProviderId)} aria-busy={r === "loading"}>
+            <article key={pid} className="card" aria-busy={r === "loading"}>
               <div className="cardhead">
-                <strong><Logo id={pid as ProviderId} />{label(pid as ProviderId)}</strong>
+                <h3 className="cardname"><Logo id={pid as ProviderId} />{label(pid as ProviderId)}</h3>
                 {r !== "loading" && (r.model || r.ms > 0) && <small>{[r.model, r.ms > 0 && `${(r.ms / 1000).toFixed(1)}s`].filter(Boolean).join(" · ")}</small>}
                 {r !== "loading" && r.promptOnly && <span className="tag">prompt</span>}
                 {r !== "loading" && r.text && <CopyBtn text={r.text} label={r.promptOnly ? "Copy prompt" : "Copy"} />}

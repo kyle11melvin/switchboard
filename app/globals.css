@@ -20,14 +20,15 @@
 
   /* Lines */
   --line: #26314a;
-  --line2: #33405c;    /* stronger: buttons */
-  --field-line: #5b6a89; /* edges of things you type or choose in: 3:1 against the panel so the field is findable */
+  --line2: #33405c;    /* stronger: chips */
+  --field-line: #5b6a89; /* edges of fields, pickers and outline buttons: 3:1 against the panel so the field is findable */
 
   /* Text */
   --text: #eef2f8;
   --muted: #94a3bd;
   --placeholder: #7a8aa6;
-  --white: #fff;
+  --white-rgb: 255, 255, 255;
+  --white: rgb(var(--white-rgb));  /* faint lifts are written rgba(var(--white-rgb), alpha) */
 
   /* Gold: the brand accent. Tints are written rgba(var(--gold-rgb), alpha). */
   --gold-rgb: 212, 175, 90;
@@ -92,11 +93,11 @@ a { text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
 .brand span { display: block; font-family: var(--body); font-size: 0.6875rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
 .topright { flex: none; display: flex; align-items: center; gap: 8px; }
 .projpill { background: var(--panel); border: 1px solid var(--field-line); border-radius: var(--pill); padding: 8px 12px; font-weight: 700; font-size: 0.8125rem; max-width: 150px; text-overflow: ellipsis; -webkit-appearance: none; appearance: none; }
-.iconbtn { position: relative; width: 40px; height: 40px; border-radius: var(--pill); border: 1px solid var(--line2); background: var(--panel); color: var(--muted); display: grid; place-items: center; padding: 0; }
+.iconbtn { position: relative; width: 40px; height: 40px; border-radius: var(--pill); border: 1px solid var(--field-line); background: var(--panel); color: var(--muted); display: grid; place-items: center; padding: 0; }
 .badge { position: absolute; top: -4px; right: -4px; background: var(--gold); color: var(--gold-ink); font-size: 0.625rem; font-weight: 800; border-radius: var(--pill); min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 4px; }
 
 /* Panels and fields */
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 0 rgba(var(--white-rgb), 0.02) inset; }
 .lbl { margin: 0; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 800; }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row .lbl { margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -110,7 +111,7 @@ select.inline { border-radius: var(--pill); padding: 6px 12px; font-size: 0.8125
 
 /* Brief header: the label folds the brief open and shut; Discard sits beside it, not inside it. */
 .briefhead { flex-wrap: nowrap; }
-.brieftoggle { flex: 1; min-width: 0; display: flex; align-items: center; padding: 0; border: 0; border-radius: 6px; background: none; text-align: left; }
+.brieftoggle { min-height: 28px; flex: 1; min-width: 0; display: flex; align-items: center; padding: 0; border: 0; border-radius: 6px; background: none; text-align: left; }
 .brieftoggle .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brieftoggle[aria-expanded="false"] .lbl::after { content: " · tap to expand"; text-transform: none; letter-spacing: 0; font-weight: 600; }
 
@@ -120,7 +121,7 @@ button:active:not(:disabled) { transform: translateY(1px); }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 .primary { background: linear-gradient(180deg, var(--gold2), var(--gold)); color: var(--gold-ink); flex: 1; min-width: 180px; box-shadow: 0 6px 18px rgba(var(--gold-rgb), 0.22); }
 .primary.wide { width: 100%; margin-bottom: 12px; }
-.ghost { background: transparent; border-color: var(--line2); color: var(--text); }
+.ghost { background: transparent; border-color: var(--field-line); color: var(--text); }
 /* Hover only where hovering exists, so it doesn't stick after a tap. */
 @media (hover: hover) { .ghost:hover:not(:disabled) { border-color: var(--gold); } }
 .small { padding: 6px 12px; font-size: 0.8125rem; }
@@ -129,7 +130,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Chips: task types, image styles, AIs */
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .chips.styles { margin-top: 10px; gap: 6px; }
-.chip { background: var(--panel2); border: 1px solid var(--line); padding: 9px 14px; border-radius: var(--pill); font-size: 0.875rem; font-weight: 600; color: var(--text); }
+.chip { background: var(--panel2); border: 1px solid var(--line2); padding: 9px 14px; border-radius: var(--pill); font-size: 0.875rem; font-weight: 600; color: var(--text); }
 .chip.on { border-color: var(--gold); background: rgba(var(--gold-rgb), 0.14); color: var(--gold2); }
 .chip.sm { padding: 6px 11px; font-size: 0.8125rem; }
 .chip small { color: var(--muted); font-weight: 600; }
@@ -179,7 +180,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .card .error { margin: 10px 0 0; }
 .carderr { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .carderr span { flex: 1 1 200px; min-width: 0; }
-.hint { margin: 12px 0 0; font-size: 0.8125rem; color: var(--muted); background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.hint { margin: 12px 0 0; font-size: 0.8125rem; color: var(--muted); background: rgba(var(--white-rgb), 0.03); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
 .skeleton { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; }
 .skeleton span { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--panel2) 25%, var(--sheen) 50%, var(--panel2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
 .skeleton span:nth-child(1) { width: 90%; }
@@ -191,7 +192,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .verdict { border-color: rgba(var(--gold-rgb), 0.6); background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.08), rgba(var(--gold-rgb), 0.02)), var(--panel); }
 .verdict .lbl { color: var(--gold2); }
 .grading { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
-.grading summary { cursor: pointer; font-weight: 700; font-size: 0.8125rem; color: var(--muted); list-style: none; display: flex; align-items: center; gap: 8px; }
+.grading summary { min-height: 28px; cursor: pointer; font-weight: 700; font-size: 0.8125rem; color: var(--muted); list-style: none; display: flex; align-items: center; gap: 8px; }
 .grading summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform 0.15s; }
 .grading[open] summary::before { transform: rotate(45deg); }
 .grading summary::-webkit-details-marker { display: none; }
@@ -200,7 +201,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .grid { display: grid; gap: 12px; grid-template-columns: 1fr; align-items: start; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
 .cardhead { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
-.cardhead strong { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9375rem; }
+.cardname { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 0.9375rem; font-weight: 700; line-height: inherit; }
 .cardhead small { font-variant-numeric: tabular-nums; color: var(--muted); margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; }
 .cites { font-size: 0.75rem; color: var(--muted); padding-left: 18px; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 .cites a { color: var(--muted); }
@@ -216,7 +217,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .md ul, .md ol { padding-left: 20px; }
 .md li { margin: 3px 0; }
 .md p, .md li, .md blockquote { max-width: 75ch; } /* readable line length on wide screens */
-.md blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--line2); color: var(--muted); background: rgba(255,255,255,0.02); border-radius: 0 8px 8px 0; }
+.md blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--line2); color: var(--muted); background: rgba(var(--white-rgb), 0.02); border-radius: 0 8px 8px 0; }
 .verdict .md blockquote { border-left-color: var(--red); color: var(--red-quote); background: rgba(var(--red-rgb), 0.06); }
 .md code { background: var(--bg2); padding: 1px 6px; border-radius: 6px; font-size: 0.8125rem; }
 .md pre { background: var(--bg2); padding: 12px; border-radius: 10px; overflow-x: auto; border: 1px solid var(--line); scrollbar-width: thin; }
@@ -243,7 +244,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 
 /* Empty state: the three steps */
 .howto { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
-.howto div { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: rgba(255,255,255,0.015); font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
+.howto div { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: rgba(var(--white-rgb), 0.015); font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
 .howto b { font-family: var(--display); font-size: 1.375rem; color: var(--gold2); line-height: 1; }
 
 /* Action bar, fixed to the bottom */
@@ -264,7 +265,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 
 /* Focus: fields get an inset gold ring, everything else an offset one */
 textarea:focus, select:focus, input:focus { outline: 2px solid var(--gold); outline-offset: -1px; }
-button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-visible { outline: 2px solid var(--gold2); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-visible, .md pre:focus-visible { outline: 2px solid var(--gold2); outline-offset: 2px; }
 .primary:focus-visible { outline-color: var(--text); }
 .switch input:focus-visible + .track { outline: 2px solid var(--gold2); outline-offset: 3px; }
 
