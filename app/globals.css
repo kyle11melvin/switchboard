@@ -217,3 +217,63 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .carderr { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .carderr span { flex: 1 1 200px; min-width: 0; }
 .hist span { overflow-wrap: anywhere; }
+
+/* Adapt: phone, home-screen app, landscape, tablet, laptop */
+
+/* Home-screen app draws under the status bar and notch; keep content clear of both. */
+main { padding-top: calc(14px + env(safe-area-inset-top)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.actionbar { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.login { min-height: 100dvh; padding-bottom: 0; }
+
+/* Touch: every control gets a 44px target. Icon buttons keep their size and grow an invisible hit area. */
+@media (pointer: coarse) {
+  button, select, summary, .switch { min-height: 44px; }
+  .chip, .chip.sm { padding-top: 10px; padding-bottom: 10px; }
+  .iconbtn { min-height: 0; }
+  .iconbtn::after { content: ""; position: absolute; inset: -5px; place-self: stretch; border-radius: 999px; }
+  .badge { z-index: 1; pointer-events: none; }
+  .hist { min-height: 56px; }
+  .grading summary, .briefpanel summary { min-height: 44px; }
+  .cites li { padding: 6px 0; }
+}
+/* Hover styles only where hovering exists, so they don't stick after a tap. */
+@media (hover: none) { .ghost:hover:not(:disabled) { border-color: var(--line2); } }
+
+/* Reading text: 16px on phones, and a readable line length on wide screens. */
+@media (max-width: 700px) { .md, .best { font-size: 16px; } }
+.md p, .md li, .md blockquote { max-width: 75ch; }
+
+/* Tables keep words whole and scroll sideways inside their box when they need to. */
+.tablewrap { overflow-x: auto; margin: 8px 0; border-radius: 8px; -webkit-overflow-scrolling: touch; }
+.tablewrap:focus-visible { outline: 2px solid var(--gold2); outline-offset: 2px; }
+.tablewrap table, .md .tablewrap table { margin: 0; width: 100%; }
+.md th, .md td { overflow-wrap: break-word; word-break: normal; }
+.md th { white-space: nowrap; }
+.md td:first-child { white-space: normal; min-width: 7ch; }
+.md td { min-width: 9ch; }
+
+/* Results grid: two columns on tablets, three only when each card has room. */
+@media (min-width: 700px) {
+  .grid.n2, .grid.n3, .grid.n4, .grid.n5 { grid-template-columns: 1fr 1fr; }
+  .grid.n3 > :last-child, .grid.n5 > :last-child { grid-column: 1 / -1; }
+}
+@media (min-width: 1080px) {
+  .grid.n3, .grid.n5 { grid-template-columns: 1fr 1fr 1fr; }
+  .grid.n3 > :last-child { grid-column: auto; }
+  .grid.n5 > :last-child { grid-column: span 2; }
+}
+
+/* Short screens (phone on its side): the fixed bar shouldn't eat the view. */
+@media (max-height: 480px) {
+  .actionbar { padding-top: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .idea textarea { min-height: 84px; }
+  .howto { display: none; }
+}
+/* Very narrow phones */
+@media (max-width: 350px) {
+  .brand { font-size: 19px; }
+  .topright { gap: 6px; }
+  .projpill { max-width: 76px; padding-left: 8px; padding-right: 8px; }
+  .actionbar { gap: 8px; }
+  .primary { min-width: 0; }
+}

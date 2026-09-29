@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PRESETS, type Preset } from "@/lib/presets";
 import { predictPreset } from "@/lib/predict";
@@ -64,6 +64,11 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 const DOMAIN: Record<ProviderId, string> = { openai: "openai.com", anthropic: "anthropic.com", xai: "x.ai", perplexity: "perplexity.ai", gemini: "gemini.google.com" };
 const MONO: Record<ProviderId, string> = { openai: "C", anthropic: "A", xai: "X", perplexity: "P", gemini: "G" };
+
+// Wide tables scroll inside their own box instead of squeezing words apart or pushing the page sideways.
+const MD: Components = {
+  table: ({ node, ...props }) => <div className="tablewrap" tabIndex={0} role="region" aria-label="Table"><table {...props} /></div>,
+};
 
 const DEFAULT_PROJECTS: Project[] = [{ id: "none", name: "No project", locked: "" }];
 
@@ -352,10 +357,10 @@ export default function Home() {
             const { best, rest, flags } = splitVerdict(verdict);
             return (
               <>
-                <div className="best md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{best}</ReactMarkdown></div>
+                <div className="best md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{best}</ReactMarkdown></div>
                 <details className="grading" open={flags > 0}>
                   <summary>{flags > 0 ? `${flags} red flag${flags === 1 ? "" : "s"} · ` : ""}Scorecard &amp; how they compared</summary>
-                  <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{rest}</ReactMarkdown></div>
+                  <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{rest}</ReactMarkdown></div>
                 </details>
               </>
             );
@@ -396,7 +401,7 @@ export default function Home() {
                       );
                     })}
                     {!r.text && !r.images?.length && <p className="muted">Images aren't kept in history. Send it again to redraw.</p>}
-                    {r.text && <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{r.text}</ReactMarkdown></div>}
+                    {r.text && <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{r.text}</ReactMarkdown></div>}
                     {r.citations && r.citations.length > 0 && (
                       <ol className="cites">{r.citations.map((c, i) => <li key={i}><a href={c} target="_blank" rel="noreferrer">{c.replace(/^https?:\/\//, "").slice(0, 60)}</a></li>)}</ol>
                     )}
