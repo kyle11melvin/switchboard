@@ -151,7 +151,16 @@ export default function Home() {
     <main>
       <header className="top">
         <div className="brand">Switchboard<span>one idea · every AI · one verdict</span></div>
-        <button className="ghost" onClick={() => setShowHistory((v) => !v)}>History ({history.length})</button>
+        <div className="topright">
+          <select className="projpill" value={projectId} onChange={(e) => { const v = e.target.value; if (v === "__new") { const name = prompt("Project name?"); if (!name) return; const np = { id: uid(), name, locked: "" }; updateProjects([...projects, np]); chooseProject(np.id); setEditingProject(true); } else { chooseProject(v); setEditingProject(false); } }}>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <option value="__new">+ New project…</option>
+          </select>
+          <button className="iconbtn" aria-label="History" onClick={() => setShowHistory((v) => !v)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            {history.length > 0 && <span className="badge">{history.length}</span>}
+          </button>
+        </div>
       </header>
 
       {showHistory && (
@@ -169,41 +178,31 @@ export default function Home() {
         </section>
       )}
 
-      {/* Project + locked decisions */}
-      <section className="panel">
-        <div className="row">
-          <label className="lbl">Project</label>
-          <select value={projectId} onChange={(e) => chooseProject(e.target.value)}>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <button className="ghost small" onClick={() => {
-            const name = prompt("Project name?"); if (!name) return;
-            const p = { id: uid(), name, locked: "" }; updateProjects([...projects, p]); chooseProject(p.id); setEditingProject(true);
-          }}>+ New</button>
-          {project?.id !== "none" && (
-            <button className="ghost small" onClick={() => setEditingProject((v) => !v)}>{editingProject ? "Done" : "Locked decisions"}</button>
+      {project?.id !== "none" && (
+        <section className="lockbar">
+          <button className="lockline" onClick={() => setEditingProject((v) => !v)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            <span>{project.locked.trim() ? `${project.locked.split("\n").filter((l) => l.trim()).length} locked decisions ride along with every prompt` : "No locked decisions yet — tap to add"}</span>
+            <span className="chev">{editingProject ? "Done" : "Edit"}</span>
+          </button>
+          {editingProject && (
+            <div className="lockeditor">
+              <textarea rows={6} value={project.locked}
+                placeholder={"One per line. Every model and the judge treat these as settled.\ne.g. Single-file HTML, no framework\ne.g. Brand colors navy #1B2A4A / gold #C9A84C"}
+                onChange={(e) => updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: e.target.value } : p)))} />
+              <button className="ghost small danger" onClick={() => {
+                if (!confirm(`Delete project "${project.name}"?`)) return;
+                updateProjects(projects.filter((p) => p.id !== project.id)); chooseProject("none"); setEditingProject(false);
+              }}>Delete project</button>
+            </div>
           )}
-        </div>
-        {project?.id !== "none" && !editingProject && project?.locked && (
-          <p className="muted clamp">🔒 {project.locked.split("\n").filter(Boolean).length} locked decisions sent with every prompt</p>
-        )}
-        {editingProject && project && project.id !== "none" && (
-          <>
-            <textarea rows={6} value={project.locked}
-              placeholder={"One per line. Every model and the judge treat these as settled.\ne.g. Single-file HTML, no framework\ne.g. Brand colors navy #1B2A4A / gold #C9A84C"}
-              onChange={(e) => updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: e.target.value } : p)))} />
-            <button className="ghost small danger" onClick={() => {
-              if (!confirm(`Delete project "${project.name}"?`)) return;
-              updateProjects(projects.filter((p) => p.id !== project.id)); chooseProject("none"); setEditingProject(false);
-            }}>Delete project</button>
-          </>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* Idea */}
-      <section className="panel">
-        <label className="lbl">Idea</label>
-        <textarea rows={4} value={idea} onChange={(e) => setIdea(e.target.value)}
+      <section className="panel idea">
+        <div className="row"><label className="lbl" htmlFor="idea">Idea</label><span className="modepill">{mode === "image" ? "Image" : "Text"}</span></div>
+        <textarea id="idea" rows={4} value={idea} onChange={(e) => setIdea(e.target.value)}
           placeholder="Dump the rough idea. Sharpen it into a brief, or send it straight out." />
 
         <div className="chips">
@@ -218,29 +217,18 @@ export default function Home() {
             const why = !p.configured ? "no key" : mode === "image" && !p.canImage ? "no images" : "";
             return (
               <button key={p.id} disabled={disabled}
-                className={`chip model ${selected.includes(p.id) && !disabled ? "on" : ""}`}
+                className={`chip model ${p.id} ${selected.includes(p.id) && !disabled ? "on" : ""}`}
                 onClick={() => toggle(p.id)} title={p.model}>
-                {p.label}{why && <small> · {why}</small>}
+                <i className="dot" />{p.label}{why && <small> · {why}</small>}
               </button>
             );
           })}
-          <span className="modepill">{mode === "image" ? "Image mode" : "Text mode"}</span>
-        </div>
-
-        <div className="row actions">
-          <button className="ghost" disabled={!idea.trim() || briefing} onClick={sharpen}>
-            {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen into brief"}
-          </button>
-          <button className="primary" disabled={!(brief || idea).trim() || !selected.length || running} onClick={send}>
-            {running ? "Running…" : `Send to ${selected.filter((s) => byId[s]?.configured).map(label).join(" + ") || "…"}`}
-          </button>
         </div>
         {mode === "text" && (
           <div className="row judgeRow">
-            <label><input type="checkbox" checked={autoJudge} onChange={(e) => setAutoJudge(e.target.checked)} /> Auto-judge</label>
-            <span className="muted">with</span>
-            <select value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
-              {providers.filter((p) => p.configured).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            <label className="switch"><input type="checkbox" checked={autoJudge} onChange={(e) => setAutoJudge(e.target.checked)} /><span className="track"><span className="knob" /></span> Auto-judge</label>
+            <select className="inline" value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
+              {providers.filter((p) => p.configured).map((p) => <option key={p.id} value={p.id}>by {p.label}</option>)}
             </select>
           </div>
         )}
@@ -248,7 +236,7 @@ export default function Home() {
 
       {brief && (
         <section className="panel">
-          <div className="row"><label className="lbl">Brief (edit freely — this is what gets sent)</label>
+          <div className="row"><label className="lbl">Brief · edit freely, this is what gets sent</label>
             <button className="ghost small" onClick={() => setBrief("")}>Discard</button></div>
           <textarea rows={10} value={brief} onChange={(e) => setBrief(e.target.value)} />
         </section>
@@ -260,7 +248,7 @@ export default function Home() {
       {(judging || verdict) && (
         <section className="panel verdict">
           <div className="row">
-            <label className="lbl">⚖️ Verdict {judging ? "" : `· judged by ${label(judgeWith)}`}</label>
+            <label className="lbl">Verdict {judging ? "" : `· judged by ${label(judgeWith)}`}</label>
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy best answer" />}
           </div>
           {judging ? <p className="muted pulse">Grading every answer against the brief{projectCtx ? " and locked decisions" : ""}…</p>
@@ -268,7 +256,7 @@ export default function Home() {
         </section>
       )}
       {canJudge && !verdict && (
-        <button className="primary wide" onClick={() => judge(done, (brief || idea).trim(), runId ?? uid())}>⚖️ Judge these answers</button>
+        <button className="primary wide" onClick={() => judge(done, (brief || idea).trim(), runId ?? uid())}>Judge these answers</button>
       )}
 
       {Object.keys(results).length > 0 && (
@@ -276,7 +264,7 @@ export default function Home() {
           {Object.entries(results).map(([pid, r]) => (
             <article key={pid} className="card">
               <div className="cardhead">
-                <strong>{label(pid as ProviderId)}</strong>
+                <strong><i className={`dot ${pid}`} />{label(pid as ProviderId)}</strong>
                 {r !== "loading" && <small>{r.model} · {(r.ms / 1000).toFixed(1)}s</small>}
                 {r !== "loading" && r.text && <CopyBtn text={r.text} label="Copy" />}
               </div>
@@ -304,6 +292,23 @@ export default function Home() {
       {providers.length > 0 && providers.every((p) => !p.configured) && (
         <div className="error">No API keys found. Add them in Vercel → Settings → Environment Variables (see README), then redeploy.</div>
       )}
+
+      {Object.keys(results).length === 0 && !brief && (
+        <section className="howto">
+          <div><b>1</b><span>Drop a rough idea</span></div>
+          <div><b>2</b><span>Sharpen it into a brief</span></div>
+          <div><b>3</b><span>Every AI answers, one judges</span></div>
+        </section>
+      )}
+
+      <div className="actionbar">
+        <button className="ghost" disabled={!idea.trim() || briefing} onClick={sharpen}>
+          {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen"}
+        </button>
+        <button className="primary" disabled={!(brief || idea).trim() || !selected.length || running} onClick={send}>
+          {running ? "Running…" : `Send to ${selected.filter((s) => byId[s]?.configured).map(label).join(" + ") || "…"}`}
+        </button>
+      </div>
     </main>
   );
 }
