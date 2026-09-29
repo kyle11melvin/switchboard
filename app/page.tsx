@@ -53,7 +53,10 @@ async function api<T>(url: string, body?: unknown): Promise<T> {
   }
   if (r.status === 401) { window.location.href = "/login"; throw new Error("You've been signed out. Taking you to the login page."); }
   let d: any = null;
-  try { d = await r.json(); } catch { /* not JSON, e.g. a platform timeout page */ }
+  try { d = await r.json(); } catch (e: any) {
+    // The reply started but was cut off part-way (a dropped connection), as opposed to a non-JSON page.
+    if (r.ok && e?.name !== "SyntaxError") throw new Error("The connection dropped before the answer finished arriving. Try again.");
+  }
   if (r.status === 504 || r.status === 408) throw new Error("Timed out waiting for the model. Try again.");
   if (!r.ok) throw new Error(typeof d?.error === "string" && d.error ? d.error : `Server error (${r.status}). Try again.`);
   if (d === null) throw new Error("Got an unreadable reply from the server. Try again.");
@@ -150,7 +153,8 @@ export default function Home() {
     if (briefing || !idea.trim()) return;
     setErr(""); setBriefing(true);
     try {
-      const d = await api<{ brief?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain });
+      const d = await api<{ brief?: string; error?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain });
+      if (d.error) throw new Error(d.error);
       if (!d.brief) throw new Error("The brief came back empty. Try again.");
       setBrief(d.brief); setBriefOpen(true);
     } catch (e: any) { setErr(`Sharpen failed: ${e.message}`); } finally { setBriefing(false); }
@@ -161,7 +165,8 @@ export default function Home() {
     if (answers.length < 1 || judging) return;
     setErr(""); setJudging(true); setVerdict("");
     try {
-      const d = await api<{ verdict?: string }>("/api/judge", { brief: promptUsed, answers, project: projectCtx, judge: judgeWith });
+      const d = await api<{ verdict?: string; error?: string }>("/api/judge", { brief: promptUsed, answers, project: projectCtx, judge: judgeWith });
+      if (d.error) throw new Error(d.error);
       if (!d.verdict) throw new Error("The verdict came back empty.");
       const v = d.verdict;
       // Keep the verdict with its run even if the screen has moved on to something else.
