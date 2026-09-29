@@ -336,13 +336,6 @@ function bestAnswer(v: string) {
   return i >= 0 ? v.slice(i).replace(/##\s*Best combined answer\s*/i, "").trim() : v;
 }
 
-// Shows /logos/<id>.svg (or .png) if you've added it to public/logos, else a monogram badge.
-function Logo({ id }: { id: ProviderId }) {
-  const [src, setSrc] = useState<string | null>(`/logos/${id}.svg`);
-  if (!src) return <i className={`mono ${id}`}>{MONO[id]}</i>;
-  return <img className="logo" src={src} alt="" onError={() => setSrc(src.endsWith(".svg") ? `/logos/${id}.png` : null)} />;
-}
-
 // Logo chain: your own file in public/logos/<id>.svg → the company's real icon by domain → monogram badge.
 function Logo({ id }: { id: ProviderId }) {
   const chain = [`/logos/${id}.svg`, `/logos/${id}.png`, `https://www.google.com/s2/favicons?domain=${DOMAIN[id]}&sz=128`];
