@@ -10,7 +10,11 @@ export default function Login() {
     try {
       const r = await fetch("/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: pw }) });
       if (r.ok) { window.location.href = "/"; return; }
-      setErr(r.status === 401 ? "Wrong password. Try again." : `Couldn't sign in (error ${r.status}). Try again in a moment.`);
+      setErr(
+        r.status === 401 ? "Wrong password. Try again."
+        : r.status === 429 || r.status === 403 ? "Too many attempts. Wait a minute, then try again."
+        : `Couldn't sign in (error ${r.status}). Try again in a moment.`,
+      );
     } catch {
       setErr(navigator.onLine === false ? "You're offline. Reconnect and try again." : "Couldn't reach Switchboard. Check your connection and try again.");
     }

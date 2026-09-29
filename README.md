@@ -38,6 +38,13 @@ Model IDs drift. Override without touching code:
 
 If a card shows a `404`/`model not found` error, that's the model ID — set the override to a current one.
 
+## Login protection
+
+Wrong passwords are slowed down in two places:
+
+- **In the code** (`app/api/login/route.ts`): every wrong guess waits one second before it's answered.
+- **In Vercel Firewall**: a rule named "Limit login attempts" allows 5 tries per minute per address on `/api/login`, then answers 429. It lives in the Vercel project, not in this repo. See it with `vercel firewall rules list --expand`.
+
 ## Run locally
 
 ```bash
