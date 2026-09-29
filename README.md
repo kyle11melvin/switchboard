@@ -7,7 +7,7 @@ One idea → sharpened brief → pick your AIs → side-by-side answers → one 
 - **Sharpen** — turns a rough idea into a tight brief (goal, deliverable, constraints, done-criteria). Edit it before sending.
 - **Presets** — routing defaults by task type (`lib/presets.ts`): Creative image → ChatGPT + Grok, Code → Claude + ChatGPT, Research → Perplexity + Claude + Gemini, Loan scenario, Gut check (all). Toggle any model on/off after picking a preset.
 - **Projects + locked decisions** — per-project list of settled facts that gets sent with every prompt *and* to the judge. Synced between your devices.
-- **Judge** — one model grades every answer blind (shuffled, labelled A/B/C, names restored afterwards; see `lib/blind.ts`): scorecard, red flags with quoted receipts, where they agree/split, a best combined answer you can copy, and what it took from each answer.
+- **Judge** — works in two steps, blind (answers are shuffled and labelled A/B/C; see `lib/blind.ts`). Step 1 grades every answer and lists the best parts of each. Step 2 writes one final answer from that list alone, without seeing the answers, so it can't copy one. Switchboard then counts how much of the final wording came from each answer (`lib/measure.ts`). You see the answer; the grading is folded away.
 - **Image mode** — ChatGPT and Grok generate images side by side; tap to download.
 - **History** — last 200 runs, synced between your devices.
 

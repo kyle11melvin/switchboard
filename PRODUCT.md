@@ -19,7 +19,7 @@ Switchboard takes one rough idea through four steps:
 1. **Sharpen** the idea into a tight brief (goal, context, deliverable, constraints, done-criteria). The brief is editable before sending.
 2. **Send** the brief to the AIs he picks.
 3. **Compare** the answers side by side.
-4. **Judge**: one model grades every answer blind and returns a verdict, a scorecard, red flags with quoted receipts, where the models agree and split, a best combined answer ready to copy, and a note on what it took from each answer.
+4. **Judge**: one model, working blind and in two steps. It grades every answer and lists the best parts of each, then writes one final answer from that list alone. Switchboard measures how much of the final wording came from each answer. Kyle sees the final answer; the scorecard, red flags and the rest are folded away.
 
 Success means the best combined answer is usable as-is, and anything fabricated or contradicting a locked decision was flagged before he relied on it.
 
@@ -68,7 +68,7 @@ The judge is the gatekeeper step Kyle otherwise does by hand. It grades answers 
 
 ## Product Principles
 
-1. **The verdict is the product.** The best combined answer comes first, because it is what actually gets used. Grading detail supports it.
+1. **The answer is the product.** Kyle wants the best answer and to move on. One final answer, never a menu of options. Everything about how it was reached stays folded until asked for.
 2. **Receipts over opinions.** Every red flag quotes the text it objects to.
    The judge never sees which model wrote which answer. Answers reach it shuffled and labelled A, B, C, and the names are restored afterwards.
 3. **Locked decisions are settled.** Models and the judge do not contradict or relitigate them, and must say so when an answer conflicts with one.

@@ -421,16 +421,22 @@ export default function Home() {
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <Skeleton /> : (() => {
-            const { best, rest, flags, sources } = verdictParts;
+            const { best, rest, flags, sources, measured } = verdictParts;
             return (
               <>
                 <div className="best md"><Markdown text={best} /></div>
                 {/* The answer is the point. How it was reached stays folded until asked for. */}
                 <details className="grading">
                   <summary>{flags > 0 ? `${flags} red flag${flags === 1 ? "" : "s"} caught · ` : ""}How this was judged</summary>
+                  {measured && (
+                    <div className="sources">
+                      <h3 className="lbl">Where the wording came from</h3>
+                      <div className="md"><Markdown text={measured} /></div>
+                    </div>
+                  )}
                   {sources && (
                     <div className="sources">
-                      <h3 className="lbl">Built from</h3>
+                      <h3 className="lbl">What the judge says it used</h3>
                       <div className="md"><Markdown text={sources} /></div>
                     </div>
                   )}
@@ -530,14 +536,15 @@ function section(v: string, title: string) {
 function splitVerdict(v: string) {
   const b = section(v, "Best combined answer");
   const s = section(v, "Built from");
+  const m = section(v, "Measured");
   const best = b ? b.text : v;
   let rest = b ? v : "";
   // Cut the later section first so the earlier one's positions stay valid.
-  for (const part of [b, s].filter(Boolean).sort((x, y) => y!.from - x!.from)) rest = rest.slice(0, part!.from) + rest.slice(part!.to);
+  for (const part of [b, s, m].filter(Boolean).sort((x, y) => y!.from - x!.from)) rest = rest.slice(0, part!.from) + rest.slice(part!.to);
   rest = rest.trim();
   const rf = rest.match(/##\s*Red flags\s*([\s\S]*?)(?=\n##|$)/i);
   const flags = rf ? (rf[1].match(/^\s*[-*>]/gm) ?? []).filter((l) => l.trim().startsWith(">")).length || (/none found/i.test(rf[1]) ? 0 : (rf[1].match(/^\s*[-*]/gm) ?? []).length) : 0;
-  return { best, rest, flags, sources: s?.text ?? "" };
+  return { best, rest, flags, sources: s?.text ?? "", measured: m?.text ?? "" };
 }
 
 function bestAnswer(v: string) {

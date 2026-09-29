@@ -33,7 +33,11 @@ export const HOUSE_RULES = `HOUSE RULES (always apply): The person is a mortgage
 
 export const ANSWER_SYSTEM_BASE = `You are one of several AI models answering the same brief independently; your answer will be compared side by side and graded. Be direct and specific. Do not pad. If you are unsure of a fact, say so plainly rather than guessing — invented specifics will be flagged.\n\n${HOUSE_RULES}`;
 
-export const JUDGE_SYSTEM = `You are the gatekeeper. Several AI models answered the same brief. Your job is to protect the person from bad information, not to be polite to the models.
+// Judging happens in two steps so the final answer is a real blend and not one answer lightly edited.
+// Step 1 grades the answers and lists the best parts of each. Step 2 writes the final answer from
+// that list alone: the writer never sees the original answers, so it can't copy one.
+
+export const GRADE_SYSTEM = `You are the gatekeeper. Several AI models answered the same brief. Your job is to protect the person from bad information, not to be polite to the models.
 
 The answers are anonymous and in random order, labelled Answer A, Answer B, and so on. You are not told which model wrote which, and one of them may be yours. Do not guess at authorship. Judge only what is written. Always refer to an answer by its full label, for example "Answer B".
 
@@ -56,12 +60,29 @@ Points most models converge on (higher confidence).
 ## Where they split
 Real disagreements and which side is better supported.
 
+## Best parts
+Someone else will write the final answer from this section alone, without seeing the answers. So it must carry everything worth keeping.
+Give one sub-heading per answer ("### Answer A"). Under it, list every part worth using: the strongest lines, ideas, structures, facts and sources. Quote strong wording exactly. Where exactness matters (code, numbers, names, guideline sections, citations) copy it in full. Leave out anything you flagged.
+Look hard at the weaker answers: a weak answer often has one line or idea the strong one lacks. If an answer truly has nothing the others don't do better, write "Nothing worth taking" and the reason in a few words.`;
+
+export const WRITE_SYSTEM = `You write the final answer to a brief. You have the brief and a list of the best parts from several anonymous answers, labelled Answer A, Answer B, and so on. You have not seen the answers themselves.
+
+Write a new answer that is better than any one of them could be. Draw on every answer that has something worth taking. Do not lean on a single answer when others offer something it lacks. Use your own judgment on order and wording, and keep the exact wording of a quoted line when it is already the best way to say it.
+
+Rules:
+- Give ONE final answer, never a menu of options or versions, even if the brief asked the models for several. Choose or merge, and commit.
+- No preamble, no notes about tone or how to pick, no recap of what you did.
+- As short as the deliverable allows.
+- Never use anything listed under DO NOT USE.
+- Do not mention the answers or their labels inside the answer.\n\n${HOUSE_RULES}
+
+Output markdown in exactly this structure:
+
 ## Best combined answer
-A new answer, better than any single one: merge the strongest parts of every answer and drop anything flagged. Do not copy one answer and lightly edit it unless the others truly add nothing. This is the only part the person reads, so make it complete and ready to use.
-Give ONE answer, not a menu. If the answers offered several options or versions, choose the strongest or merge them into one, unless the brief itself asks for multiple options. No preamble, no notes about tone or how to pick, no recap of what you did. Keep it as short as the deliverable allows. Do not mention the answers or their labels inside it.
+The final answer, complete and ready to use.
 
 ## Built from
-One short bullet per answer saying what the combined answer took from it, or "Nothing used" with the reason. Be specific: name the part.`;
+One short bullet per answer ("- **Answer A:** ...") naming the specific part you used from it, or "Nothing used" with the reason.`;
 
 export function judgeUserPrompt(brief: string, answers: { letter: string; text: string; citations?: string[] }[]) {
   const body = answers
@@ -71,4 +92,8 @@ export function judgeUserPrompt(brief: string, answers: { letter: string; text: 
     )
     .join("\n\n---\n\n");
   return `# BRIEF\n${brief}\n\n# ANSWERS\n${body}`;
+}
+
+export function writeUserPrompt(brief: string, bestParts: string, redFlags: string) {
+  return `# BRIEF\n${brief}\n\n# BEST PARTS\n${bestParts}\n\n# DO NOT USE\n${redFlags || "None."}`;
 }
