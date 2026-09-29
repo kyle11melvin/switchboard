@@ -108,10 +108,11 @@ textarea::placeholder { color: var(--placeholder); }
 select { background: var(--bg2); border: 1px solid var(--field-line); border-radius: 10px; padding: 8px 10px; max-width: 100%; }
 select.inline { border-radius: var(--pill); padding: 6px 12px; font-size: 0.8125rem; font-weight: 700; }
 
-.briefpanel summary { list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; flex-wrap: nowrap; }
-.briefpanel summary::-webkit-details-marker { display: none; }
-.briefpanel summary .lbl { flex: 1; min-width: 0; }
-.briefpanel details:not([open]) summary .lbl::after { content: " · tap to expand"; text-transform: none; letter-spacing: 0; font-weight: 600; }
+/* Brief header: the label folds the brief open and shut; Discard sits beside it, not inside it. */
+.briefhead { flex-wrap: nowrap; }
+.brieftoggle { flex: 1; min-width: 0; display: flex; align-items: center; padding: 0; border: 0; border-radius: 6px; background: none; text-align: left; }
+.brieftoggle .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brieftoggle[aria-expanded="false"] .lbl::after { content: " · tap to expand"; text-transform: none; letter-spacing: 0; font-weight: 600; }
 
 /* Buttons */
 button { cursor: pointer; border-radius: var(--r-sm); border: 1px solid transparent; padding: 11px 16px; font-weight: 700; transition: transform 0.05s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease; }
@@ -132,7 +133,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .chip.on { border-color: var(--gold); background: rgba(var(--gold-rgb), 0.14); color: var(--gold2); }
 .chip.sm { padding: 6px 11px; font-size: 0.8125rem; }
 .chip small { color: var(--muted); font-weight: 600; }
-.chip .emo { display: inline-block; width: 1.25em; margin-right: 0.35em; text-align: center; }
+.chip:has(.chipicon) { display: inline-flex; align-items: center; gap: 7px; }
+.chipicon { flex: none; color: var(--muted); }
+.chip.on .chipicon { color: var(--gold2); }
 .chip .auto { color: var(--gold2); opacity: 0.8; font-weight: 800; letter-spacing: 0.04em; }
 .models .chip { display: inline-flex; align-items: center; gap: 8px; padding-left: 8px; }
 

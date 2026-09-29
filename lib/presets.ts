@@ -10,17 +10,18 @@ export interface Preset {
 }
 
 // Edit freely — these are your routing defaults. Tap a preset, then toggle any model on/off.
+// Each preset's icon is drawn in app/page.tsx (PRESET_ICONS), matched by id. A new id shows no icon until you add one.
 export const PRESETS: Preset[] = [
   {
     id: "image",
-    label: "🎨 Creative image",
+    label: "Creative image",
     mode: "image",
     models: ["openai", "xai"],
     judge: false,
   },
   {
     id: "copy",
-    label: "✍️ Copy & marketing",
+    label: "Copy & marketing",
     mode: "text",
     models: ["openai", "anthropic", "xai"],
     judge: true,
@@ -28,7 +29,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "build",
-    label: "🛠 Code & build",
+    label: "Code & build",
     mode: "text",
     models: ["anthropic", "openai"],
     judge: true,
@@ -36,7 +37,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "research",
-    label: "🔎 Research",
+    label: "Research",
     mode: "text",
     models: ["perplexity", "anthropic", "gemini"],
     judge: true,
@@ -44,7 +45,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "mortgage",
-    label: "🏠 Loan scenario",
+    label: "Loan scenario",
     mode: "text",
     models: ["anthropic", "openai", "perplexity"],
     judge: true,
@@ -52,7 +53,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "all",
-    label: "⚡ Gut check (all)",
+    label: "Gut check (all)",
     mode: "text",
     models: ["openai", "anthropic", "xai", "perplexity", "gemini"],
     judge: true,

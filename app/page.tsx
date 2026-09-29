@@ -91,6 +91,7 @@ export default function Home() {
 
   const [brief, setBrief] = useState("");
   const [briefing, setBriefing] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(true); // folds away once answers arrive, so the verdict is what you see
   const [results, setResults] = useState<Record<string, RunResult | "loading">>({});
   const [verdict, setVerdict] = useState("");
   const [judging, setJudging] = useState(false);
@@ -151,7 +152,7 @@ export default function Home() {
     try {
       const d = await api<{ brief?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain });
       if (!d.brief) throw new Error("The brief came back empty. Try again.");
-      setBrief(d.brief);
+      setBrief(d.brief); setBriefOpen(true);
     } catch (e: any) { setErr(`Sharpen failed: ${e.message}`); } finally { setBriefing(false); }
   }
 
@@ -200,7 +201,7 @@ export default function Home() {
     const targets = selected.filter((s) => byId[s]?.configured);
     // Cmd+Enter lands here too, so guard against a second run while one is in flight.
     if (!prompt || !targets.length || running) return;
-    setErr(""); setVerdict("");
+    setErr(""); setVerdict(""); setBriefOpen(false);
     const id = uid(); setRunId(id); setRunPrompt(prompt); activeRun.current = id;
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
@@ -223,7 +224,7 @@ export default function Home() {
   function openHistory(h: HistoryItem) {
     setIdea(h.idea); setBrief(h.brief === h.idea ? "" : h.brief); setMode(h.mode);
     setResults(Object.fromEntries(h.results.map((r) => [r.provider, r])));
-    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false);
+    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
   }
 
@@ -298,7 +299,7 @@ export default function Home() {
 
         <div className="chips" role="group" aria-label="Task type">
           {PRESETS.map((p) => (
-            <button key={p.id} aria-pressed={preset.id === p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}><PresetLabel text={p.label} />{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
+            <button key={p.id} aria-pressed={preset.id === p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}><PresetIcon id={p.id} />{p.label}{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
           ))}
         </div>
 
@@ -337,11 +338,13 @@ export default function Home() {
 
       {brief && (
         <section className="panel briefpanel">
-          <details open={Object.keys(results).length === 0}>
-            <summary className="row"><span className="lbl">Brief · edit freely, this is what gets sent</span>
-              <button className="ghost small" onClick={(e) => { e.preventDefault(); setBrief(""); }}>Discard</button></summary>
-            <textarea rows={10} aria-label="Brief" value={brief} onChange={(e) => setBrief(e.target.value)} />
-          </details>
+          <div className="row briefhead">
+            <button className="brieftoggle" aria-expanded={briefOpen} aria-controls="brief" onClick={() => setBriefOpen((v) => !v)}>
+              <span className="lbl">Brief · edit freely, this is what gets sent</span>
+            </button>
+            <button className="ghost small" onClick={() => setBrief("")}>Discard</button>
+          </div>
+          {briefOpen && <textarea id="brief" rows={10} aria-label="Brief" value={brief} onChange={(e) => setBrief(e.target.value)} />}
         </section>
       )}
 
@@ -471,12 +474,19 @@ function Logo({ id }: { id: ProviderId }) {
   return <img className={`logo ${ok ? "ok" : ""}`} src={src} alt="" decoding="async" onLoad={() => setOk(true)} onError={() => setSrc("")} />;
 }
 
-// Preset labels start with an emoji ("🎨 Creative image"). Give it its own fixed-width slot so labels line up,
-// and keep it out of what screen readers announce.
-function PresetLabel({ text }: { text: string }) {
-  const i = text.indexOf(" ");
-  if (i < 1 || /^[\w(]/.test(text)) return <>{text}</>;
-  return <><span className="emo" aria-hidden="true">{text.slice(0, i)}</span>{text.slice(i + 1)}</>;
+// Task-type icons, drawn in the same line style as the header icons. Keyed by preset id.
+const PRESET_ICONS: Record<string, React.ReactNode> = {
+  image: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="1.6" /><path d="M21 16l-5-5-8 9" /></>,
+  copy: <><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z" /><path d="M14 7l3 3" /></>,
+  build: <path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14" />,
+  research: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>,
+  mortgage: <><path d="M4 11l8-7 8 7" /><path d="M6 10v9h12v-9" /><path d="M10 19v-5h4v5" /></>,
+  all: <path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z" />,
+};
+function PresetIcon({ id }: { id: string }) {
+  const shape = PRESET_ICONS[id];
+  if (!shape) return null;
+  return <svg className="chipicon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{shape}</svg>;
 }
 
 // Three grey lines standing in for text that's on its way.
@@ -488,7 +498,7 @@ function CopyBtn({ text, label }: { text: string; label: string }) {
   const [ok, setOk] = useState("");
   return (
     <button className="ghost small" onClick={async () => {
-      try { await navigator.clipboard.writeText(text); setOk("Copied ✓"); } catch { setOk("Copy failed"); }
+      try { await navigator.clipboard.writeText(text); setOk("Copied"); } catch { setOk("Copy failed"); }
       setTimeout(() => setOk(""), 1600);
     }}><span aria-live="polite">{ok || label}</span></button>
   );
