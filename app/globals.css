@@ -79,6 +79,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .mono.perplexity { background: var(--perplexity); color: #06232a; }
 .mono.gemini { background: var(--gemini); color: #fff; }
 .models .chip { padding-left: 8px; }
+.logo { width: 22px; height: 22px; border-radius: 50%; object-fit: contain; background: #fff; padding: 2px; flex: none; }
+.chip:disabled .logo { opacity: 0.35; filter: grayscale(1); }
+.logo { width: 22px; height: 22px; border-radius: 50%; object-fit: contain; background: #fff; padding: 3px; flex: none; }
+.chip:disabled .logo { opacity: 0.35; }
 .chip .auto { color: var(--gold2); opacity: 0.8; font-weight: 800; letter-spacing: 0.04em; }
 .modepill { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold2); background: rgba(212, 175, 90, 0.12); border: 1px solid rgba(212, 175, 90, 0.35); border-radius: 999px; padding: 3px 10px; }
 

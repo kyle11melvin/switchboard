@@ -24,6 +24,7 @@ const load = <T,>(k: string, fallback: T): T => {
 const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ } };
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+const DOMAIN: Record<ProviderId, string> = { openai: "openai.com", anthropic: "anthropic.com", xai: "x.ai", perplexity: "perplexity.ai", gemini: "gemini.google.com" };
 const MONO: Record<ProviderId, string> = { openai: "C", anthropic: "A", xai: "X", perplexity: "P", gemini: "G" };
 
 const DEFAULT_PROJECTS: Project[] = [{ id: "none", name: "No project", locked: "" }];
@@ -236,7 +237,7 @@ export default function Home() {
               <button key={p.id} disabled={disabled}
                 className={`chip model ${p.id} ${selected.includes(p.id) && !disabled ? "on" : ""}`}
                 onClick={() => toggle(p.id)} title={p.model}>
-                <i className={`mono ${p.id}`}>{MONO[p.id]}</i>{p.label}{why && <small> · {why}</small>}
+                <Logo id={p.id} />{p.label}{why && <small> · {why}</small>}
               </button>
             );
           })}
@@ -281,7 +282,7 @@ export default function Home() {
           {Object.entries(results).map(([pid, r]) => (
             <article key={pid} className="card">
               <div className="cardhead">
-                <strong><i className={`mono ${pid}`}>{MONO[pid as ProviderId]}</i>{label(pid as ProviderId)}</strong>
+                <strong><Logo id={pid as ProviderId} />{label(pid as ProviderId)}</strong>
                 {r !== "loading" && <small>{r.model} · {(r.ms / 1000).toFixed(1)}s</small>}
                 {r !== "loading" && r.text && <CopyBtn text={r.text} label="Copy" />}
               </div>
@@ -333,6 +334,21 @@ export default function Home() {
 function bestAnswer(v: string) {
   const i = v.search(/##\s*Best combined answer/i);
   return i >= 0 ? v.slice(i).replace(/##\s*Best combined answer\s*/i, "").trim() : v;
+}
+
+// Shows /logos/<id>.svg (or .png) if you've added it to public/logos, else a monogram badge.
+function Logo({ id }: { id: ProviderId }) {
+  const [src, setSrc] = useState<string | null>(`/logos/${id}.svg`);
+  if (!src) return <i className={`mono ${id}`}>{MONO[id]}</i>;
+  return <img className="logo" src={src} alt="" onError={() => setSrc(src.endsWith(".svg") ? `/logos/${id}.png` : null)} />;
+}
+
+// Logo chain: your own file in public/logos/<id>.svg → the company's real icon by domain → monogram badge.
+function Logo({ id }: { id: ProviderId }) {
+  const chain = [`/logos/${id}.svg`, `/logos/${id}.png`, `https://www.google.com/s2/favicons?domain=${DOMAIN[id]}&sz=128`];
+  const [i, setI] = useState(0);
+  if (i >= chain.length) return <i className={`mono ${id}`}>{MONO[id]}</i>;
+  return <img className="logo" src={chain[i]} alt="" onError={() => setI(i + 1)} />;
 }
 
 function CopyBtn({ text, label }: { text: string; label: string }) {
