@@ -1,5 +1,5 @@
 /*
-  Switchboard styles. Navy and gold, Fraunces for display, Manrope for everything else.
+  Switchboard styles. Harbor palette (slate teal and copper), Fraunces for display, Manrope for everything else.
 
   Order: tokens → base → header → panels and fields → buttons → chips → switch → lock bar
   → messages → verdict → results → markdown → history → empty state → action bar → login
@@ -10,38 +10,40 @@
 
 :root {
   /* Surfaces, darkest to lightest */
-  --bg-rgb: 11, 15, 24;
+  --bg-rgb: 10, 21, 23;
   --bg: rgb(var(--bg-rgb));
-  --bg2: #0f1522;      /* fields and code blocks */
-  --panel: #151c2b;    /* panels and cards */
-  --panel2: #1b2436;   /* chips, table headers */
-  --glow: #1a2440;     /* soft light at the top of the page */
-  --sheen: #243049;    /* highlight in the loading shimmer */
+  --bg2: #0e1c1f;      /* fields and code blocks */
+  --panel: #12252a;    /* panels and cards */
+  --panel2: #183138;   /* chips, table headers */
+  --glow: #1c3a42;     /* soft light at the top of the page */
+  --sheen: #25434c;    /* highlight in the loading shimmer */
 
   /* Lines */
-  --line: #26314a;
-  --line2: #33405c;    /* stronger: chips */
-  --field-line: #5b6a89; /* edges of fields, pickers and outline buttons: 3:1 against the panel so the field is findable */
+  --line: #223d45;
+  --line2: #2e4f59;    /* stronger: chips */
+  --field-line: #5f818c; /* edges of fields, pickers and outline buttons: 3:1 against the panel so the field is findable */
 
   /* Text */
-  --text: #eef2f8;
-  --muted: #94a3bd;
-  --placeholder: #7a8aa6;
+  --text: #ecf3f4;
+  --muted: #97adb3;
+  --placeholder: #8199a1;
   --white-rgb: 255, 255, 255;
   --white: rgb(var(--white-rgb));  /* faint lifts are written rgba(var(--white-rgb), alpha) */
 
-  /* Gold: the brand accent. Tints are written rgba(var(--gold-rgb), alpha). */
-  --gold-rgb: 212, 175, 90;
-  --gold: rgb(var(--gold-rgb));
-  --gold2: #ecc978;    /* lighter: text and focus rings on navy */
-  --gold-ink: #1c1505; /* text on gold */
-  --gold-edge: rgba(var(--gold-rgb), 0.35); /* border on gold-tinted boxes */
+  /* Copper: the one accent. It marks the name, what's selected, Send, the verdict, links and focus.
+     Headings, labels and decoration stay in the text colors.
+     Tints are written rgba(var(--accent-rgb), alpha). */
+  --accent-rgb: 217, 137, 91;
+  --accent: rgb(var(--accent-rgb));
+  --accent2: #f0aa80;    /* lighter: text and focus rings on teal */
+  --accent-ink: #1f0f05; /* text on copper */
+  --accent-edge: rgba(var(--accent-rgb), 0.35); /* border on copper-tinted boxes */
 
   /* Red: errors and the judge's red flags */
-  --red-rgb: 240, 113, 113;
+  --red-rgb: 244, 124, 124;
   --red: rgb(var(--red-rgb));
-  --red-text: #ffc0c0;
-  --red-quote: #f5c9c9;
+  --red-text: #ffc6c6;
+  --red-quote: #f7cdcd;
 
   /* Provider colors, used by the monogram fallback */
   --openai: #10a37f;
@@ -81,20 +83,20 @@ main {
   padding: calc(14px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 120px max(var(--gutter), env(safe-area-inset-left));
 }
 button, select, textarea, input { font: inherit; color: inherit; }
-textarea, input { caret-color: var(--gold2); }
-input[type="checkbox"] { accent-color: var(--gold); }
+textarea, input { caret-color: var(--accent2); }
+input[type="checkbox"] { accent-color: var(--accent); }
 a { text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
-::selection { background: rgba(var(--gold-rgb), 0.35); }
+::selection { background: rgba(var(--accent-rgb), 0.35); }
 .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 /* Header */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0 18px; }
-.brand { min-width: 0; flex: 1; margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.625rem; letter-spacing: -0.02em; color: var(--gold2); line-height: 1.1; }
+.brand { min-width: 0; flex: 1; margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.625rem; letter-spacing: -0.02em; color: var(--accent2); line-height: 1.1; }
 .brand span { display: block; font-family: var(--body); font-size: 0.6875rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
 .topright { flex: none; display: flex; align-items: center; gap: 8px; }
 .projpill { background: var(--panel); border: 1px solid var(--field-line); border-radius: var(--pill); padding: 8px 12px; font-weight: 700; font-size: 0.8125rem; max-width: 150px; text-overflow: ellipsis; -webkit-appearance: none; appearance: none; }
 .iconbtn { position: relative; width: 40px; height: 40px; border-radius: var(--pill); border: 1px solid var(--field-line); background: var(--panel); color: var(--muted); display: grid; place-items: center; padding: 0; }
-.badge { position: absolute; top: -4px; right: -4px; background: var(--gold); color: var(--gold-ink); font-size: 0.625rem; font-weight: 800; border-radius: var(--pill); min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 4px; }
+.badge { position: absolute; top: -4px; right: -4px; background: var(--accent); color: var(--accent-ink); font-size: 0.625rem; font-weight: 800; border-radius: var(--pill); min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 4px; }
 
 /* Panels and fields */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 0 rgba(var(--white-rgb), 0.02) inset; }
@@ -118,11 +120,11 @@ select.inline { border-radius: var(--pill); padding: 6px 12px; font-size: 0.8125
 button { cursor: pointer; border-radius: var(--r-sm); border: 1px solid transparent; padding: 11px 16px; font-weight: 700; transition: transform 0.05s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease; }
 button:active:not(:disabled) { transform: translateY(1px); }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
-.primary { background: linear-gradient(180deg, var(--gold2), var(--gold)); color: var(--gold-ink); flex: 1; min-width: 180px; box-shadow: 0 6px 18px rgba(var(--gold-rgb), 0.22); }
+.primary { background: linear-gradient(180deg, var(--accent2), var(--accent)); color: var(--accent-ink); flex: 1; min-width: 180px; box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.22); }
 .primary.wide { width: 100%; margin-bottom: 12px; }
 .ghost { background: transparent; border-color: var(--field-line); color: var(--text); }
 /* Hover only where hovering exists, so it doesn't stick after a tap. */
-@media (hover: hover) { .ghost:hover:not(:disabled) { border-color: var(--gold); } }
+@media (hover: hover) { .ghost:hover:not(:disabled) { border-color: var(--accent); } }
 .small { padding: 6px 12px; font-size: 0.8125rem; }
 .danger { color: var(--red); margin-top: 8px; }
 .primary.small { flex: none; min-width: 0; }
@@ -141,13 +143,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .chips.styles { margin-top: 10px; gap: 6px; }
 .chip { background: var(--panel2); border: 1px solid var(--line2); padding: 9px 14px; border-radius: var(--pill); font-size: 0.875rem; font-weight: 600; color: var(--text); }
-.chip.on { border-color: var(--gold); background: rgba(var(--gold-rgb), 0.14); color: var(--gold2); }
+.chip.on { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.14); color: var(--accent2); }
 .chip.sm { padding: 6px 11px; font-size: 0.8125rem; }
 .chip small { color: var(--muted); font-weight: 600; }
 .chip:has(.chipicon) { display: inline-flex; align-items: center; gap: 7px; }
 .chipicon { flex: none; color: var(--muted); }
-.chip.on .chipicon { color: var(--gold2); }
-.chip .auto { color: var(--gold2); opacity: 0.8; font-weight: 800; letter-spacing: 0.04em; }
+.chip.on .chipicon { color: var(--accent2); }
+.chip .auto { color: var(--accent2); opacity: 0.8; font-weight: 800; letter-spacing: 0.04em; }
 .models .chip { display: inline-flex; align-items: center; gap: 8px; padding-left: 8px; }
 
 /* Provider badge: a logo when one loads, a monogram when none does. Both are 22px circles. */
@@ -156,7 +158,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .logo.ok { opacity: 1; }
 span.logo { display: inline-block; } /* holds the space while the logo loads */
 .mono { display: inline-grid; place-items: center; font-style: normal; font-weight: 800; font-size: 0.75rem; color: var(--bg); background: var(--muted); font-family: var(--display); }
-/* Navy text passes 4.5:1 on every provider color; white did not. */
+/* Dark text passes 4.5:1 on every provider color; white did not. */
 .mono.openai { background: var(--openai); }
 .mono.anthropic { background: var(--anthropic); }
 .mono.xai { background: var(--xai); }
@@ -165,9 +167,9 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .chip:disabled .mono { opacity: 0.35; }
 .chip:disabled .logo { opacity: 0.35; filter: grayscale(1); }
 
-/* Small gold labels */
-.modepill { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold2); background: rgba(var(--gold-rgb), 0.12); border: 1px solid var(--gold-edge); border-radius: var(--pill); padding: 3px 10px; }
-.tag { font-size: 0.625rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold2); border: 1px solid rgba(var(--gold-rgb), 0.4); border-radius: var(--pill); padding: 2px 8px; }
+/* Small quiet labels */
+.modepill { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: rgba(var(--white-rgb), 0.03); border: 1px solid var(--line2); border-radius: var(--pill); padding: 3px 10px; }
+.tag { font-size: 0.625rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line2); border-radius: var(--pill); padding: 2px 8px; }
 
 /* Auto-judge switch */
 .judgeRow { margin-top: 14px; font-size: 0.875rem; justify-content: space-between; }
@@ -175,13 +177,14 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .track { width: 40px; height: 24px; border-radius: var(--pill); background: var(--field-line); position: relative; transition: background 0.15s; }
 .knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--white); transition: transform 0.18s var(--ease-out); }
-.switch input:checked + .track { background: var(--gold); }
+.switch input:checked + .track { background: var(--accent); }
 .switch input:checked + .track .knob { transform: translateX(16px); }
 
 /* Lock bar: the project's locked decisions */
 .lockbar { margin-bottom: 12px; }
-.lockline { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; background: rgba(var(--gold-rgb), 0.07); border: 1px dashed rgba(var(--gold-rgb), 0.45); color: var(--gold2); border-radius: var(--r-sm); padding: 11px 14px; font-size: 0.8125rem; font-weight: 600; }
+.lockline { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; background: rgba(var(--white-rgb), 0.02); border: 1px dashed var(--line2); color: var(--text); border-radius: var(--r-sm); padding: 11px 14px; font-size: 0.8125rem; font-weight: 600; }
 .lockline span:nth-child(2) { flex: 1; }
+.lockline svg { flex: none; color: var(--accent2); } /* the lock is the one accent here */
 .chev { color: var(--muted); font-weight: 700; }
 .lockeditor { margin-top: 8px; }
 
@@ -199,8 +202,8 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 
 /* Verdict */
 .anchor { scroll-margin-top: 12px; }
-.verdict { border-color: rgba(var(--gold-rgb), 0.6); background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.08), rgba(var(--gold-rgb), 0.02)), var(--panel); }
-.verdict .lbl { color: var(--gold2); }
+.verdict { border-color: rgba(var(--accent-rgb), 0.6); background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.02)), var(--panel); }
+.verdict .lbl { color: var(--accent2); }
 .grading { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 .grading summary { min-height: 28px; cursor: pointer; font-weight: 700; font-size: 0.8125rem; color: var(--muted); list-style: none; display: flex; align-items: center; gap: 8px; }
 .grading summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform 0.15s; }
@@ -221,7 +224,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 
 /* Markdown: answers and verdicts */
 .md { overflow-wrap: anywhere; font-size: 0.9375rem; }
-.md h1, .md h2, .md h3 { font-family: var(--display); font-weight: 700; font-size: 1.125rem; margin: 18px 0 6px; color: var(--gold2); letter-spacing: -0.01em; text-wrap: balance; }
+.md h1, .md h2, .md h3 { font-family: var(--display); font-weight: 700; font-size: 1.125rem; margin: 18px 0 6px; color: var(--text); letter-spacing: -0.01em; text-wrap: balance; }
 .md h1:first-child, .md h2:first-child, .md h3:first-child { margin-top: 10px; }
 .md p { margin: 8px 0; }
 .md ul, .md ol { padding-left: 20px; }
@@ -232,7 +235,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .md code { background: var(--bg2); padding: 1px 6px; border-radius: 6px; font-size: 0.8125rem; }
 .md pre { background: var(--bg2); padding: 12px; border-radius: 10px; overflow-x: auto; border: 1px solid var(--line); scrollbar-width: thin; }
 .md pre code { padding: 0; background: none; }
-.md a { color: var(--gold2); }
+.md a { color: var(--accent2); }
 .md hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 /* Tables keep words whole and scroll sideways inside their box when they need to. */
 .tablewrap { scrollbar-width: thin; overflow-x: auto; margin: 8px 0; border-radius: 8px; -webkit-overflow-scrolling: touch; }
@@ -243,7 +246,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .md td:first-child { min-width: 7ch; }
 
 /* The verdict's best answer: the thing that actually gets used */
-.best { position: relative; margin-top: 10px; padding: 14px 16px; background: rgba(var(--gold-rgb), 0.10); border: 1px solid var(--gold-edge); border-radius: var(--r-sm); font-size: 1rem; }
+.best { position: relative; margin-top: 10px; padding: 14px 16px; background: rgba(var(--accent-rgb), 0.10); border: 1px solid var(--accent-edge); border-radius: var(--r-sm); font-size: 1rem; }
 .best p:first-child { margin-top: 0; }
 .best p:last-child { margin-bottom: 0; }
 
@@ -255,7 +258,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 /* Empty state: the three steps */
 .howto { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
 .howto div { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: rgba(var(--white-rgb), 0.015); font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
-.howto b { font-family: var(--display); font-size: 1.375rem; color: var(--gold2); line-height: 1; }
+.howto b { font-family: var(--display); font-size: 1.375rem; color: var(--text); line-height: 1; }
 
 /* Action bar, fixed to the bottom */
 .actionbar {
@@ -273,11 +276,11 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .login .error { margin: 0; }
 .login .brand { margin-bottom: 6px; }
 
-/* Focus: fields get an inset gold ring, everything else an offset one */
-textarea:focus, select:focus, input:focus { outline: 2px solid var(--gold); outline-offset: -1px; }
-button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-visible, .md pre:focus-visible { outline: 2px solid var(--gold2); outline-offset: 2px; }
+/* Focus: fields get an inset copper ring, everything else an offset one */
+textarea:focus, select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-visible, .md pre:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
 .primary:focus-visible { outline-color: var(--text); }
-.switch input:focus-visible + .track { outline: 2px solid var(--gold2); outline-offset: 3px; }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent2); outline-offset: 3px; }
 
 /* Touch: every control gets a 44px target. Icon buttons keep their size and grow an invisible hit area. */
 @media (pointer: coarse) {
@@ -334,9 +337,9 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
 
 /* Motion is feedback here. One authored moment (the verdict landing); everything else is quick and quiet. */
 
-/* Focal moment: a gold line connects across the top, then the best answer unrolls beneath it. */
+/* Focal moment: a copper line connects across the top, then the best answer unrolls beneath it. */
 .best { animation: verdict-in 520ms var(--ease-out) backwards; }
-.best::before { content: ""; position: absolute; left: 12px; right: 12px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--gold), var(--gold2)); transform-origin: left center; opacity: 0; pointer-events: none; animation: verdict-line 760ms var(--ease-out) backwards; }
+.best::before { content: ""; position: absolute; left: 12px; right: 12px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transform-origin: left center; opacity: 0; pointer-events: none; animation: verdict-line 760ms var(--ease-out) backwards; }
 .grading { animation: settle 320ms ease-out 260ms backwards; }
 
 /* Continuity: answers fade in where their placeholder was; panels open from the control that opened them. */

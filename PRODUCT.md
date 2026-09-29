@@ -54,7 +54,9 @@ The judge is the gatekeeper step Kyle otherwise does by hand. It grades answers 
 ## Brand Commitments
 
 - Name: **Switchboard**. Current tagline in the header: "one idea · every AI · one verdict".
-- Look: navy and gold, with Fraunces for display type and Manrope for body type. This is binding.
+- Type: Fraunces for display and Manrope for body.
+- Colors: the Harbor palette, slate teal with one copper accent. Kyle chose it on 29 Sept 2026 to replace navy and gold. Values live in `DESIGN.md`.
+- Feel: "The Night Desk": a calm desk with one lamp, quiet surfaces, and the accent used sparingly on what matters (the name, what's selected, Send, the verdict).
 - Voice in the interface is plain and direct ("Dump the rough idea", "Judge these answers").
 
 ## Evidence on Hand

@@ -6,3 +6,4 @@ node_modules
 next-env.d.ts
 scripts/
 .vercel
+.impeccable/hook.cache.json

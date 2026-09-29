@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Switchboard" },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0b0f18", viewportFit: "cover" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0a1517", viewportFit: "cover" };
 
 // Which override logos exist, read once at build time (see public/logos/README.md).
 function ownLogos(): string {

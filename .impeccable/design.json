@@ -1,0 +1,482 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T21:26:13.771Z",
+  "title": "Design System: Switchboard",
+  "extensions": {
+    "colorMeta": {
+      "copper": {
+        "role": "primary",
+        "displayName": "Copper",
+        "canonical": "#d9895b",
+        "tonalRamp": [
+          "#3e200e",
+          "#6c3719",
+          "#9d5124",
+          "#cf6a30",
+          "#db8e62",
+          "#e6b293",
+          "#f1d2c1",
+          "#faf0ea"
+        ]
+      },
+      "copper-light": {
+        "role": "primary",
+        "displayName": "Light Copper",
+        "canonical": "#f0aa80",
+        "tonalRamp": [
+          "#441f08",
+          "#77350e",
+          "#ad4e14",
+          "#e4661b",
+          "#eb8b52",
+          "#f1b088",
+          "#f7d1bb",
+          "#fcf0e8"
+        ]
+      },
+      "copper-ink": {
+        "role": "primary",
+        "displayName": "Copper Ink",
+        "canonical": "#1f0f05",
+        "tonalRamp": [
+          "#42200b",
+          "#723712",
+          "#a7511b",
+          "#dc6a23",
+          "#e48e58",
+          "#edb28d",
+          "#f4d2bd",
+          "#fbf0e9"
+        ]
+      },
+      "harbor-night": {
+        "role": "neutral",
+        "displayName": "Harbor Night",
+        "canonical": "#0a1517",
+        "tonalRamp": [
+          "#173135",
+          "#28545c",
+          "#3b7b87",
+          "#4da2b2",
+          "#78b9c4",
+          "#a3cfd7",
+          "#cae3e8",
+          "#edf6f7"
+        ]
+      },
+      "harbor-well": {
+        "role": "neutral",
+        "displayName": "Harbor Well",
+        "canonical": "#0e1c1f",
+        "tonalRamp": [
+          "#183035",
+          "#29535b",
+          "#3c7986",
+          "#4f9fb0",
+          "#79b6c3",
+          "#a4cdd6",
+          "#cae2e7",
+          "#edf5f7"
+        ]
+      },
+      "harbor-panel": {
+        "role": "neutral",
+        "displayName": "Harbor Panel",
+        "canonical": "#12252a",
+        "tonalRamp": [
+          "#172f36",
+          "#28525d",
+          "#3a7888",
+          "#4d9db3",
+          "#77b5c5",
+          "#a2ccd7",
+          "#c9e2e8",
+          "#edf5f7"
+        ]
+      },
+      "harbor-raised": {
+        "role": "neutral",
+        "displayName": "Harbor Raised",
+        "canonical": "#183138",
+        "tonalRamp": [
+          "#172f36",
+          "#28515d",
+          "#3a7788",
+          "#4d9cb3",
+          "#77b4c5",
+          "#a2ccd7",
+          "#c9e1e8",
+          "#edf5f7"
+        ]
+      },
+      "harbor-glow": {
+        "role": "neutral",
+        "displayName": "Harbor Glow",
+        "canonical": "#1c3a42",
+        "tonalRamp": [
+          "#172f36",
+          "#27525d",
+          "#3a7888",
+          "#4c9db3",
+          "#77b5c5",
+          "#a2ccd8",
+          "#c9e2e8",
+          "#edf5f7"
+        ]
+      },
+      "tide-line": {
+        "role": "neutral",
+        "displayName": "Tide Line",
+        "canonical": "#223d45",
+        "tonalRamp": [
+          "#192d33",
+          "#2c4f59",
+          "#407382",
+          "#5497ab",
+          "#7db0bf",
+          "#a6c9d3",
+          "#cce0e6",
+          "#eef5f7"
+        ]
+      },
+      "tide-line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Tide Line",
+        "canonical": "#2e4f59",
+        "tonalRamp": [
+          "#1a2d32",
+          "#2d4e57",
+          "#427180",
+          "#5795a8",
+          "#7fafbd",
+          "#a8c8d2",
+          "#cddfe5",
+          "#eef4f6"
+        ]
+      },
+      "field-edge": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "canonical": "#5f818c",
+        "tonalRamp": [
+          "#1f2a2e",
+          "#36494f",
+          "#4e6a73",
+          "#678c98",
+          "#8ca8b1",
+          "#b0c3c9",
+          "#d1dce0",
+          "#f0f3f5"
+        ]
+      },
+      "sea-salt": {
+        "role": "neutral",
+        "displayName": "Sea Salt",
+        "canonical": "#ecf3f4",
+        "tonalRamp": [
+          "#1c2e30",
+          "#315054",
+          "#47747b",
+          "#5d99a2",
+          "#84b1b8",
+          "#abcace",
+          "#cfe0e3",
+          "#eff5f6"
+        ]
+      },
+      "fog": {
+        "role": "neutral",
+        "displayName": "Fog",
+        "canonical": "#97adb3",
+        "tonalRamp": [
+          "#202a2c",
+          "#38484d",
+          "#526a70",
+          "#6c8b93",
+          "#8fa7ad",
+          "#b2c3c7",
+          "#d3dcdf",
+          "#f0f3f4"
+        ]
+      },
+      "fog-dim": {
+        "role": "neutral",
+        "displayName": "Dim Fog",
+        "canonical": "#8199a1",
+        "tonalRamp": [
+          "#21292c",
+          "#39474c",
+          "#53686f",
+          "#6d8992",
+          "#90a5ac",
+          "#b3c2c6",
+          "#d3dcde",
+          "#f0f3f4"
+        ]
+      },
+      "flag-red": {
+        "role": "tertiary",
+        "displayName": "Flag Red",
+        "canonical": "#f47c7c",
+        "tonalRamp": [
+          "#470606",
+          "#7a0a0a",
+          "#b30f0f",
+          "#eb1414",
+          "#f04c4c",
+          "#f58585",
+          "#f9b8b8",
+          "#fde7e7"
+        ]
+      },
+      "flag-red-text": {
+        "role": "tertiary",
+        "displayName": "Flag Red Text",
+        "canonical": "#ffc6c6",
+        "tonalRamp": [
+          "#4d0000",
+          "#850000",
+          "#c20000",
+          "#ff0000",
+          "#ff3d3d",
+          "#ff7a7a",
+          "#ffb3b3",
+          "#ffe5e5"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The name Switchboard."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Headings inside answers and the verdict."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "The AI's name on an answer card."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Interface text."
+      },
+      "reading": {
+        "displayName": "Reading",
+        "purpose": "Answers on phones and the best answer everywhere."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase panel labels such as IDEA and VERDICT."
+      },
+      "display-phone": {
+        "displayName": "Display, phone",
+        "purpose": "The name under 480px wide."
+      },
+      "display-narrow": {
+        "displayName": "Display, narrow phone",
+        "purpose": "The name under 350px wide."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "The 1, 2, 3 of the empty-state steps."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Chip labels, error messages, confirmations."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Small buttons, hints, the scorecard toggle."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Timings, model names, history details."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "The history count and the prompt tag."
+      }
+    },
+    "shadows": [
+      {
+        "name": "send-glow",
+        "value": "0 6px 18px rgba(217, 137, 91, 0.22)",
+        "purpose": "Under the Send button only."
+      },
+      {
+        "name": "panel-top-light",
+        "value": "0 1px 0 rgba(255, 255, 255, 0.02) inset",
+        "purpose": "Faint inner highlight on the top edge of panels."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Arrivals: the verdict reveal, panels opening, the switch knob."
+      },
+      {
+        "name": "verdict-in",
+        "value": "520ms",
+        "purpose": "The best answer unrolling when the verdict lands."
+      },
+      {
+        "name": "verdict-line",
+        "value": "760ms",
+        "purpose": "The copper line drawn across the top of the best answer."
+      },
+      {
+        "name": "settle",
+        "value": "160ms to 320ms",
+        "purpose": "Fades for answers, errors and confirmations."
+      },
+      {
+        "name": "state",
+        "value": "150ms",
+        "purpose": "Button, chip and border color changes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-phone",
+        "value": "350px"
+      },
+      {
+        "name": "phone",
+        "value": "480px"
+      },
+      {
+        "name": "two-column",
+        "value": "700px"
+      },
+      {
+        "name": "centered-bar",
+        "value": "900px"
+      },
+      {
+        "name": "three-column",
+        "value": "1080px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Send button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action. Copper fill with the lamp's glow beneath.",
+      "html": "<button class=\"ds-btn-primary\">Send to 3 AIs</button>",
+      "css": ".ds-btn-primary { font-family: var(--body, Manrope, sans-serif); font-weight: 700; font-size: 0.9375rem; color: var(--accent-ink, #1f0f05); background: linear-gradient(180deg, var(--accent2, #f0aa80), var(--accent, #d9895b)); border: 1px solid transparent; border-radius: 12px; padding: 11px 16px; min-width: 180px; box-shadow: 0 6px 18px rgba(217, 137, 91, 0.22); cursor: pointer; transition: transform 0.05s ease; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--text, #ecf3f4); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary actions: Sharpen, Copy, Discard.",
+      "html": "<button class=\"ds-btn-ghost\">Sharpen</button>",
+      "css": ".ds-btn-ghost { font-family: var(--body, Manrope, sans-serif); font-weight: 700; font-size: 0.9375rem; color: var(--text, #ecf3f4); background: transparent; border: 1px solid var(--field-line, #5f818c); border-radius: 12px; padding: 11px 16px; cursor: pointer; transition: border-color 0.15s ease; } .ds-btn-ghost:hover { border-color: var(--accent, #d9895b); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--accent2, #f0aa80); outline-offset: 2px; }"
+    },
+    {
+      "name": "Task chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "A choice. Pill shape, line icon, quiet until selected.",
+      "html": "<button class=\"ds-chip\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"6.5\"/><path d=\"M16 16l4.5 4.5\"/></svg>Research</button>",
+      "css": ".ds-chip { font-family: var(--body, Manrope, sans-serif); display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 0.875rem; color: var(--text, #ecf3f4); background: var(--panel2, #183138); border: 1px solid var(--line2, #2e4f59); border-radius: 999px; padding: 9px 14px; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease; } .ds-chip svg { color: var(--muted, #97adb3); } .ds-chip:focus-visible { outline: 2px solid var(--accent2, #f0aa80); outline-offset: 2px; }"
+    },
+    {
+      "name": "Task chip, selected",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "The chosen task. One of the four places copper is allowed.",
+      "html": "<button class=\"ds-chip-on\" aria-pressed=\"true\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20l1-4L16 5l3 3L8 19l-4 1z\"/><path d=\"M14 7l3 3\"/></svg>Copy &amp; marketing</button>",
+      "css": ".ds-chip-on { font-family: var(--body, Manrope, sans-serif); display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 0.875rem; color: var(--accent2, #f0aa80); background: rgba(217, 137, 91, 0.14); border: 1px solid var(--accent, #d9895b); border-radius: 999px; padding: 9px 14px; cursor: pointer; } .ds-chip-on:focus-visible { outline: 2px solid var(--accent2, #f0aa80); outline-offset: 2px; }"
+    },
+    {
+      "name": "Idea field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Recessed field with a findable edge and a copper focus ring.",
+      "html": "<textarea class=\"ds-field\" rows=\"3\" placeholder=\"Dump the rough idea. Sharpen it into a brief, or send it straight out.\"></textarea>",
+      "css": ".ds-field { font-family: var(--body, Manrope, sans-serif); width: 100%; font-size: 16px; line-height: 1.5; color: var(--text, #ecf3f4); background: var(--bg2, #0e1c1f); border: 1px solid var(--field-line, #5f818c); border-radius: 12px; padding: 12px 14px; caret-color: var(--accent2, #f0aa80); resize: vertical; } .ds-field::placeholder { color: var(--placeholder, #8199a1); } .ds-field:focus { outline: 2px solid var(--accent, #d9895b); outline-offset: -1px; }"
+    },
+    {
+      "name": "Verdict",
+      "kind": "custom",
+      "refersTo": "verdict-best",
+      "description": "The signature component: the judge's best answer, edged in copper.",
+      "html": "<section class=\"ds-verdict\"><div class=\"ds-verdict-label\">Verdict \u00b7 judged by Claude</div><div class=\"ds-verdict-best\">Keep your low rate. Get your cash.</div></section>",
+      "css": ".ds-verdict { font-family: var(--body, Manrope, sans-serif); background: linear-gradient(180deg, rgba(217, 137, 91, 0.08), rgba(217, 137, 91, 0.02)), var(--panel, #12252a); border: 1px solid rgba(217, 137, 91, 0.6); border-radius: 16px; padding: 16px; color: var(--text, #ecf3f4); } .ds-verdict-label { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent2, #f0aa80); } .ds-verdict-best { margin-top: 10px; padding: 14px 16px; font-size: 1rem; line-height: 1.55; background: rgba(217, 137, 91, 0.10); border: 1px solid rgba(217, 137, 91, 0.35); border-radius: 12px; }"
+    },
+    {
+      "name": "Answer card",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "One AI's answer. Flat, hairline border, header row.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-card-head\"><strong>Claude</strong><small>12.4s</small></div><p>Keep your low rate. Get your cash.</p></article>",
+      "css": ".ds-card { font-family: var(--body, Manrope, sans-serif); background: var(--panel, #12252a); border: 1px solid var(--line, #223d45); border-radius: 16px; padding: 16px; color: var(--text, #ecf3f4); font-size: 0.9375rem; line-height: 1.55; } .ds-card-head { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line, #223d45); } .ds-card-head small { color: var(--muted, #97adb3); font-size: 0.75rem; font-variant-numeric: tabular-nums; } .ds-card p { margin: 10px 0 0; }"
+    },
+    {
+      "name": "Red flag",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "A quoted receipt from the judge.",
+      "html": "<blockquote class=\"ds-flag\">\u201cRates as low as 6.5%\u201d \u2014 Grok \u2014 promises a rate</blockquote>",
+      "css": ".ds-flag { font-family: var(--body, Manrope, sans-serif); margin: 0; padding: 6px 12px; font-size: 0.9375rem; line-height: 1.55; color: var(--red-quote, #f7cdcd); background: rgba(244, 124, 124, 0.06); border-left: 3px solid var(--red, #f47c7c); border-radius: 0 8px 8px 0; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Desk",
+    "overview": "Switchboard is a desk at night with one lamp on. The surfaces are dark slate teal and stay quiet. The lamp is copper, and it lights only what deserves attention: the name, what is selected, the Send button, and the verdict. Everything else waits in the text colors.\n\nThis is a working tool for one person, used on a phone and a laptop. It is scanned and operated, not admired. Density is moderate, controls are large enough to tap, and nothing moves unless something happened. The one authored moment is the verdict arriving, because the verdict is the product.\n\nThe palette is called Harbor. It replaced navy and gold on 29 September 2026. The feel and the accent rule were chosen by the owner; the values below are recorded from the shipped stylesheet, `app/globals.css`.",
+    "keyCharacteristics": [
+      "Dark slate-teal surfaces in four close steps, with a soft glow at the top of the page.",
+      "One copper accent, used sparingly.",
+      "Fraunces for the name and headings, Manrope for everything else.",
+      "Hairline borders and tonal steps carry depth. Shadows are nearly absent.",
+      "Pills for things you choose, rounded rectangles for things you read or type in."
+    ],
+    "rules": [
+      {
+        "name": "The One Lamp Rule",
+        "body": "Copper marks the name, what is selected, Send, the verdict, links and focus. Headings, labels, icons at rest and decoration stay in Sea Salt or Fog. If copper appears in a fifth place, remove it from one of the first four or don't add it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Against Cool Rule",
+        "body": "The accent is the only warm color on the screen. Neutrals stay tinted toward teal; never add a warm grey.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Voices Rule",
+        "body": "Fraunces names things. Manrope says everything else. Buttons, chips, labels and body text are never set in Fraunces.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Desk Rule",
+        "body": "Nothing floats. No drop shadows on cards, chips or panels. If something needs to stand out, change its surface step or give it the accent.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do follow the One Lamp Rule: copper on the name, what is selected, Send, the verdict, links and focus.",
+      "Do build depth from the four surface steps and 1px hairlines.",
+      "Do keep field, picker and outline-button edges at 3:1 or better against their surface, and text at 4.5:1 or better.",
+      "Do use pills for choices and rounded rectangles for content.",
+      "Do keep every touch control at 44px or taller.",
+      "Do put the verdict above the answers. It is what gets used.",
+      "Do give every animation a reduced-motion version that keeps the state change visible.",
+      "Do take every color, radius and easing from the tokens in `app/globals.css`."
+    ],
+    "donts": [
+      "Don't use copper on headings, labels, icons at rest, dividers or decoration.",
+      "Don't add a second accent color. Red is for errors, deletion and red flags only.",
+      "Don't add drop shadows to cards, chips or panels.",
+      "Don't set buttons, chips or body text in Fraunces.",
+      "Don't use emoji or text glyphs as icons. Icons are drawn, 2px stroke, round caps.",
+      "Don't use browser pop-ups to ask or confirm. Ask in place.",
+      "Don't return to navy and gold. That palette was replaced."
+    ]
+  }
+}
