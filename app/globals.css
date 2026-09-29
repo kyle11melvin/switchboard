@@ -171,3 +171,31 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   .projpill { max-width: 118px; padding: 7px 10px; }
   .howto div { font-size: 12px; padding: 10px; }
 }
+
+.tag { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold2); border: 1px solid rgba(212,175,90,0.4); border-radius: 999px; padding: 2px 8px; }
+.hint { margin: 12px 0 0; font-size: 13px; color: var(--muted); background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.skeleton { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; }
+.skeleton span { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--panel2) 25%, #243049 50%, var(--panel2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+.skeleton span:nth-child(1) { width: 90%; } .skeleton span:nth-child(2) { width: 70%; } .skeleton span:nth-child(3) { width: 80%; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* Verdict layout */
+.anchor { scroll-margin-top: 12px; }
+.best { margin-top: 10px; padding: 14px 16px; background: rgba(212,175,90,0.10); border: 1px solid rgba(212,175,90,0.35); border-radius: 12px; font-size: 16px; }
+.best p:first-child { margin-top: 0; } .best p:last-child { margin-bottom: 0; }
+.grading { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.grading summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--muted); list-style: none; display: flex; align-items: center; gap: 8px; }
+.grading summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform 0.15s; }
+.grading[open] summary::before { transform: rotate(45deg); }
+.grading summary::-webkit-details-marker { display: none; }
+/* Tables on phone */
+.md table { display: table; }
+.md td:first-child, .md th:first-child { white-space: nowrap; }
+@media (max-width: 480px) { .md table { font-size: 13px; } .md th, .md td { padding: 6px 7px; } }
+.row .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.briefpanel summary { list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; flex-wrap: nowrap; }
+.briefpanel summary::-webkit-details-marker { display: none; }
+.briefpanel summary .lbl { flex: 1; min-width: 0; }
+.briefpanel details:not([open]) summary .lbl::after { content: " · tap to expand"; text-transform: none; letter-spacing: 0; font-weight: 600; }
+.logo { opacity: 0; } .logo.ok { opacity: 1; }

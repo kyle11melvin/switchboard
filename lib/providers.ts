@@ -10,6 +10,7 @@ export interface RunResult {
   text?: string;
   images?: string[]; // data URLs
   citations?: string[];
+  promptOnly?: boolean; // image mode, model can't draw: text is a prompt to paste elsewhere
   error?: string;
   ms: number;
 }
@@ -82,7 +83,12 @@ async function postJSON(url: string, headers: Record<string, string>, body: unkn
   }
   if (!res.ok) {
     const msg = data?.error?.message || data?.error || data?.message || raw.slice(0, 300);
-    throw new Error(`${res.status}: ${typeof msg === "string" ? msg : JSON.stringify(msg)}`);
+    const text = typeof msg === "string" ? msg : JSON.stringify(msg);
+    if (res.status === 401 || res.status === 403) throw new Error(`Key rejected (${res.status}). Check the API key in Vercel and redeploy.`);
+    if (res.status === 402 || /insufficient|credit|quota|billing/i.test(text)) throw new Error(`Out of credit on this provider — add billing in their console. (${text.slice(0, 120)})`);
+    if (res.status === 404 || /model.*not (found|exist)|does not exist/i.test(text)) throw new Error(`Model ID not recognized — set the *_MODEL env var in Vercel to a current one. (${text.slice(0, 120)})`);
+    if (res.status === 429) throw new Error(`Rate limited — try again in a moment.`);
+    throw new Error(`${res.status}: ${text}`);
   }
   return data;
 }
@@ -145,11 +151,14 @@ export async function runText(id: ProviderId, system: string, prompt: string): P
   }
 }
 
+const IMAGE_PROMPT_SYSTEM = `You cannot generate images, so instead write ONE production-ready image-generation prompt for the idea. Output only the prompt (60-120 words): subject, composition, lens/lighting, style, mood, aspect ratio, and "no text" unless text is requested. Then on a new line add "Negative: " with 5-8 things to avoid.`;
+
 export async function runImage(id: ProviderId, prompt: string): Promise<RunResult> {
   const t0 = Date.now();
   const def = PROVIDERS[id];
   if (!def.imageModel) {
-    return { provider: id, model: def.textModel(), error: `${def.label} doesn't generate images here`, ms: 0 };
+    const r = await runText(id, IMAGE_PROMPT_SYSTEM, prompt);
+    return { ...r, promptOnly: true };
   }
   const model = def.imageModel();
   try {

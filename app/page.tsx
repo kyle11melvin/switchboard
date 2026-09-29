@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PRESETS, type Preset } from "@/lib/presets";
@@ -10,7 +10,7 @@ type ProviderId = "openai" | "anthropic" | "xai" | "perplexity" | "gemini";
 type Mode = "text" | "image";
 
 interface ProviderInfo { id: ProviderId; label: string; configured: boolean; canImage: boolean; model: string }
-interface RunResult { provider: ProviderId; model: string; text?: string; images?: string[]; citations?: string[]; error?: string; ms: number }
+interface RunResult { provider: ProviderId; model: string; text?: string; images?: string[]; citations?: string[]; promptOnly?: boolean; error?: string; ms: number }
 interface Project { id: string; name: string; locked: string }
 interface HistoryItem {
   id: string; at: number; idea: string; brief: string; mode: Mode; projectName?: string;
@@ -54,6 +54,7 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/status").then((r) => r.json()).then((d) => {
@@ -120,11 +121,12 @@ export default function Home() {
 
   async function send() {
     const prompt = (brief || idea).trim();
-    const targets = selected.filter((s) => byId[s]?.configured && (mode === "text" || byId[s]?.canImage));
+    const targets = selected.filter((s) => byId[s]?.configured);
     if (!prompt || !targets.length) return;
     setErr(""); setVerdict("");
     const id = uid(); setRunId(id);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 
     const finished = await Promise.all(targets.map(async (provider) => {
       let res: RunResult;
@@ -160,7 +162,7 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  const sendable = selected.filter((s) => byId[s]?.configured && (mode === "text" || byId[s]?.canImage));
+  const sendable = selected.filter((s) => byId[s]?.configured);
   const done = Object.values(results).filter((r) => r !== "loading") as RunResult[];
   const running = Object.values(results).some((r) => r === "loading");
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
@@ -174,6 +176,9 @@ export default function Home() {
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             <option value="__new">+ New project…</option>
           </select>
+          {Object.keys(results).length > 0 && (
+            <button className="ghost small" onClick={() => { setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>New</button>
+          )}
           <button className="iconbtn" aria-label="History" onClick={() => setShowHistory((v) => !v)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
             {history.length > 0 && <span className="badge">{history.length}</span>}
@@ -220,7 +225,7 @@ export default function Home() {
       {/* Idea */}
       <section className="panel idea">
         <div className="row"><label className="lbl" htmlFor="idea">Idea</label><span className="modepill">{mode === "image" ? "Image" : "Text"}</span></div>
-        <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)}
+        <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } }}
           placeholder="Dump the rough idea. Sharpen it into a brief, or send it straight out." />
 
         <div className="chips">
@@ -229,10 +234,13 @@ export default function Home() {
           ))}
         </div>
 
+        {mode === "image" && !selected.some((s) => byId[s]?.configured && byId[s]?.canImage) && (
+          <p className="hint">No image-capable key yet (ChatGPT or Grok). The models below will write you a ready-to-paste image prompt instead.</p>
+        )}
         <div className="chips models">
           {providers.map((p) => {
-            const disabled = !p.configured || (mode === "image" && !p.canImage);
-            const why = !p.configured ? "no key" : mode === "image" && !p.canImage ? "no images" : "";
+            const disabled = !p.configured;
+            const why = !p.configured ? "no key" : mode === "image" && !p.canImage ? "prompt only" : "";
             return (
               <button key={p.id} disabled={disabled}
                 className={`chip model ${p.id} ${selected.includes(p.id) && !disabled ? "on" : ""}`}
@@ -253,24 +261,38 @@ export default function Home() {
       </section>
 
       {brief && (
-        <section className="panel">
-          <div className="row"><label className="lbl">Brief · edit freely, this is what gets sent</label>
-            <button className="ghost small" onClick={() => setBrief("")}>Discard</button></div>
-          <textarea rows={10} value={brief} onChange={(e) => setBrief(e.target.value)} />
+        <section className="panel briefpanel">
+          <details open={Object.keys(results).length === 0}>
+            <summary className="row"><span className="lbl">Brief · edit freely, this is what gets sent</span>
+              <button className="ghost small" onClick={(e) => { e.preventDefault(); setBrief(""); }}>Discard</button></summary>
+            <textarea rows={10} value={brief} onChange={(e) => setBrief(e.target.value)} />
+          </details>
         </section>
       )}
 
       {err && <div className="error">{err}</div>}
+
+      <div ref={resultsRef} className="anchor" />
 
       {/* Verdict first — it's the thing you actually use */}
       {(judging || verdict) && (
         <section className="panel verdict">
           <div className="row">
             <label className="lbl">Verdict {judging ? "" : `· judged by ${label(judgeWith)}`}</label>
-            {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy best answer" />}
+            {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
-          {judging ? <p className="muted pulse">Grading every answer against the brief{projectCtx ? " and locked decisions" : ""}…</p>
-            : <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{verdict}</ReactMarkdown></div>}
+          {judging ? <div className="skeleton"><span /><span /><span /></div> : (() => {
+            const { best, rest, flags } = splitVerdict(verdict);
+            return (
+              <>
+                <div className="best md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{best}</ReactMarkdown></div>
+                <details className="grading" open={flags > 0}>
+                  <summary>{flags > 0 ? `${flags} red flag${flags === 1 ? "" : "s"} · ` : ""}Scorecard &amp; how they compared</summary>
+                  <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{rest}</ReactMarkdown></div>
+                </details>
+              </>
+            );
+          })()}
         </section>
       )}
       {canJudge && !verdict && (
@@ -284,9 +306,10 @@ export default function Home() {
               <div className="cardhead">
                 <strong><Logo id={pid as ProviderId} />{label(pid as ProviderId)}</strong>
                 {r !== "loading" && <small>{r.model} · {(r.ms / 1000).toFixed(1)}s</small>}
-                {r !== "loading" && r.text && <CopyBtn text={r.text} label="Copy" />}
+                {r !== "loading" && r.promptOnly && <span className="tag">prompt</span>}
+                {r !== "loading" && r.text && <CopyBtn text={r.text} label={r.promptOnly ? "Copy prompt" : "Copy"} />}
               </div>
-              {r === "loading" ? <p className="muted pulse">Thinking…</p>
+              {r === "loading" ? <div className="skeleton"><span /><span /><span /></div>
                 : r.error ? <p className="error">{r.error}</p>
                 : (
                   <>
@@ -324,11 +347,20 @@ export default function Home() {
           {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen"}
         </button>
         <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={send}>
-          {running ? "Running…" : sendable.length ? `Send to ${sendable.map(label).join(" + ")}` : mode === "image" ? "Images need an OpenAI or xAI key" : "Pick at least one AI"}
+          {running ? "Running…" : sendable.length ? (sendable.length > 2 ? `Send to ${sendable.length} AIs` : `Send to ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
         </button>
       </div>
     </main>
   );
+}
+
+function splitVerdict(v: string) {
+  const i = v.search(/##\s*Best combined answer/i);
+  const best = i >= 0 ? v.slice(i).replace(/##\s*Best combined answer\s*/i, "").trim() : v;
+  const rest = i >= 0 ? v.slice(0, i).trim() : "";
+  const rf = rest.match(/##\s*Red flags\s*([\s\S]*?)(?=\n##|$)/i);
+  const flags = rf ? (rf[1].match(/^\s*[-*>]/gm) ?? []).filter((l) => l.trim().startsWith(">")).length || (/none found/i.test(rf[1]) ? 0 : (rf[1].match(/^\s*[-*]/gm) ?? []).length) : 0;
+  return { best, rest, flags };
 }
 
 function bestAnswer(v: string) {
@@ -340,8 +372,9 @@ function bestAnswer(v: string) {
 function Logo({ id }: { id: ProviderId }) {
   const chain = [`/logos/${id}.svg`, `/logos/${id}.png`, `https://www.google.com/s2/favicons?domain=${DOMAIN[id]}&sz=128`];
   const [i, setI] = useState(0);
+  const [ok, setOk] = useState(false);
   if (i >= chain.length) return <i className={`mono ${id}`}>{MONO[id]}</i>;
-  return <img className="logo" src={chain[i]} alt="" onError={() => setI(i + 1)} />;
+  return <img className={`logo ${ok ? "ok" : ""}`} src={chain[i]} alt="" onLoad={() => setOk(true)} onError={() => setI(i + 1)} />;
 }
 
 function CopyBtn({ text, label }: { text: string; label: string }) {
