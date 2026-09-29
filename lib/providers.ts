@@ -153,11 +153,11 @@ export async function runText(id: ProviderId, system: string, prompt: string): P
 
 const IMAGE_PROMPT_SYSTEM = `You cannot generate images, so instead write ONE production-ready image-generation prompt for the idea. Output only the prompt (60-120 words): subject, composition, lens/lighting, style, mood, aspect ratio, and "no text" unless text is requested. Then on a new line add "Negative: " with 5-8 things to avoid.`;
 
-export async function runImage(id: ProviderId, prompt: string): Promise<RunResult> {
+export async function runImage(id: ProviderId, prompt: string, styleNote?: string): Promise<RunResult> {
   const t0 = Date.now();
   const def = PROVIDERS[id];
   if (!def.imageModel) {
-    const r = await runText(id, IMAGE_PROMPT_SYSTEM, prompt);
+    const r = await runText(id, [IMAGE_PROMPT_SYSTEM, styleNote].filter(Boolean).join("\n\n"), prompt);
     return { ...r, promptOnly: true };
   }
   const model = def.imageModel();

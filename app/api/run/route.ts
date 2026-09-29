@@ -10,7 +10,11 @@ export async function POST(req: Request) {
     provider: ProviderId; mode: "text" | "image"; prompt: string; project?: ProjectCtx | null; presetNote?: string;
   };
   if (!prompt?.trim()) return NextResponse.json({ error: "Empty prompt" }, { status: 400 });
-  if (mode === "image") return NextResponse.json(await runImage(provider, prompt));
+  if (mode === "image") {
+    // Non-image models get the style rules as guidance; image models get the prompt as-is
+    // (a sharpened brief already carries the style; a raw idea is sent raw so the model interprets it).
+    return NextResponse.json(await runImage(provider, prompt, presetNote));
+  }
   const system = [ANSWER_SYSTEM_BASE, contextBlock(project, presetNote)].filter(Boolean).join("\n\n");
   return NextResponse.json(await runText(provider, system, prompt));
 }

@@ -203,3 +203,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .briefpanel summary .lbl { flex: 1; min-width: 0; }
 .briefpanel details:not([open]) summary .lbl::after { content: " · tap to expand"; text-transform: none; letter-spacing: 0; font-weight: 600; }
 .logo { opacity: 0; } .logo.ok { opacity: 1; }
+
+.styles { margin-top: 10px; gap: 6px; }
+.chip.sm { padding: 6px 11px; font-size: 13px; }

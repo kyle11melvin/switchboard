@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PRESETS, type Preset } from "@/lib/presets";
 import { predictPreset } from "@/lib/predict";
+import { IMAGE_STYLES } from "@/lib/imageStyles";
 
 type ProviderId = "openai" | "anthropic" | "xai" | "perplexity" | "gemini";
 type Mode = "text" | "image";
@@ -41,6 +42,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>(PRESETS[1].mode);
   const [selected, setSelected] = useState<ProviderId[]>(PRESETS[1].models);
   const [autoJudge, setAutoJudge] = useState(true);
+  const [imgStyle, setImgStyle] = useState("auto");
   const [presetLocked, setPresetLocked] = useState(false); // true once the person picks a preset by hand
   const [predicted, setPredicted] = useState<string | null>(null);
   const [judgeWith, setJudgeWith] = useState<ProviderId>("anthropic");
@@ -67,6 +69,8 @@ export default function Home() {
 
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
   const projectCtx = project && project.id !== "none" ? { name: project.name, locked: project.locked } : null;
+  const styleNote = mode === "image" ? IMAGE_STYLES.find((x) => x.id === imgStyle)?.note : undefined;
+  const noteFor = [preset.note, styleNote].filter(Boolean).join("\n\n") || undefined;
   const byId = useMemo(() => Object.fromEntries(providers.map((p) => [p.id, p])), [providers]);
   const label = (id: ProviderId) => byId[id]?.label ?? id;
 
@@ -95,7 +99,7 @@ export default function Home() {
     try {
       const r = await fetch("/api/brief", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ idea, mode, project: projectCtx, presetNote: preset.note, brain }),
+        body: JSON.stringify({ idea, mode, project: projectCtx, presetNote: noteFor, brain }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
@@ -133,7 +137,7 @@ export default function Home() {
       try {
         const r = await fetch("/api/run", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ provider, mode, prompt, project: projectCtx, presetNote: preset.note }),
+          body: JSON.stringify({ provider, mode, prompt, project: projectCtx, presetNote: noteFor }),
         });
         res = await r.json();
       } catch (e: any) {
@@ -238,6 +242,13 @@ export default function Home() {
 
         {mode === "image" && !selected.some((s) => byId[s]?.configured && byId[s]?.canImage) && (
           <p className="hint">No image-capable key yet (ChatGPT or Grok). The models below will write you a ready-to-paste image prompt instead.</p>
+        )}
+        {mode === "image" && (
+          <div className="chips styles">
+            {IMAGE_STYLES.map((st) => (
+              <button key={st.id} className={`chip sm ${imgStyle === st.id ? "on" : ""}`} onClick={() => setImgStyle(st.id)}>{st.label}</button>
+            ))}
+          </div>
         )}
         <div className="chips models">
           {providers.map((p) => {

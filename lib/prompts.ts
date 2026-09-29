@@ -27,7 +27,7 @@ Output ONLY the brief, in this shape (markdown, no preamble):
 **Done looks like:** 2-3 checkable criteria.
 **Open questions:** only if something genuinely ambiguous would change the answer; otherwise omit this line. State the assumption the models should make.
 
-Keep it under 200 words. Do not answer the idea yourself. If the idea is for an image, write the Deliverable as a single vivid, concrete image-generation prompt (subject, composition, lighting, style, aspect, text-free unless text is requested).`;
+Keep it under 200 words. Do not answer the idea yourself. IMAGE REQUESTS ARE DIFFERENT: if the idea is for an image, ignore the structure above and output ONLY the finished image-generation prompt itself (no headings, no labels, 60-140 words), because it is sent verbatim to the image model: aspect ratio first, then subject, composition, materials, lighting direction, lens/style, mood; quote any required text exactly and demand it be legible, else say "no text"; finish with an AVOID line. Follow any TEMPLATE supplied below.`;
 
 export const ANSWER_SYSTEM_BASE = `You are one of several AI models answering the same brief independently; your answer will be compared side by side and graded. Be direct and specific. Do not pad. If you are unsure of a fact, say so plainly rather than guessing — invented specifics will be flagged.`;
 
