@@ -71,13 +71,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .chip.on { border-color: var(--gold); background: rgba(212, 175, 90, 0.14); color: var(--gold2); }
 .chip small { color: var(--muted); font-weight: 600; }
 .models .chip { display: inline-flex; align-items: center; gap: 8px; }
-.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
-.chip:disabled .dot { opacity: 0.35; }
-.openai .dot, .dot.openai { background: var(--openai); }
-.anthropic .dot, .dot.anthropic { background: var(--anthropic); }
-.xai .dot, .dot.xai { background: var(--xai); }
-.perplexity .dot, .dot.perplexity { background: var(--perplexity); }
-.gemini .dot, .dot.gemini { background: var(--gemini); }
+.mono { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-style: normal; font-weight: 800; font-size: 12px; flex: none; color: #0b0f18; background: var(--muted); font-family: var(--display); }
+.chip:disabled .mono { opacity: 0.35; }
+.mono.openai { background: var(--openai); color: #fff; }
+.mono.anthropic { background: var(--anthropic); color: #fff; }
+.mono.xai { background: var(--xai); color: #0b0f18; }
+.mono.perplexity { background: var(--perplexity); color: #06232a; }
+.mono.gemini { background: var(--gemini); color: #fff; }
+.models .chip { padding-left: 8px; }
+.chip .auto { color: var(--gold2); opacity: 0.8; font-weight: 800; letter-spacing: 0.04em; }
 .modepill { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold2); background: rgba(212, 175, 90, 0.12); border: 1px solid rgba(212, 175, 90, 0.35); border-radius: 999px; padding: 3px 10px; }
 
 .judgeRow { margin-top: 14px; font-size: 14px; justify-content: space-between; }

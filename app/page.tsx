@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PRESETS, type Preset } from "@/lib/presets";
+import { predictPreset } from "@/lib/predict";
 
 type ProviderId = "openai" | "anthropic" | "xai" | "perplexity" | "gemini";
 type Mode = "text" | "image";
@@ -23,6 +24,8 @@ const load = <T,>(k: string, fallback: T): T => {
 const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ } };
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+const MONO: Record<ProviderId, string> = { openai: "C", anthropic: "A", xai: "X", perplexity: "P", gemini: "G" };
+
 const DEFAULT_PROJECTS: Project[] = [{ id: "none", name: "No project", locked: "" }];
 
 export default function Home() {
@@ -37,6 +40,8 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>(PRESETS[1].mode);
   const [selected, setSelected] = useState<ProviderId[]>(PRESETS[1].models);
   const [autoJudge, setAutoJudge] = useState(true);
+  const [presetLocked, setPresetLocked] = useState(false); // true once the person picks a preset by hand
+  const [predicted, setPredicted] = useState<string | null>(null);
   const [judgeWith, setJudgeWith] = useState<ProviderId>("anthropic");
 
   const [brief, setBrief] = useState("");
@@ -63,8 +68,19 @@ export default function Home() {
   const byId = useMemo(() => Object.fromEntries(providers.map((p) => [p.id, p])), [providers]);
   const label = (id: ProviderId) => byId[id]?.label ?? id;
 
-  function pickPreset(p: Preset) {
+  function applyPreset(p: Preset) {
     setPreset(p); setMode(p.mode); setSelected(p.models); setAutoJudge(p.judge);
+  }
+  function pickPreset(p: Preset) { setPresetLocked(true); applyPreset(p); }
+  useEffect(() => { if (!idea.trim()) setPresetLocked(false); }, [idea]);
+  function onIdeaChange(v: string) {
+    setIdea(v);
+    const id = predictPreset(v);
+    setPredicted(id);
+    if (!presetLocked && id && id !== preset.id) {
+      const p = PRESETS.find((x) => x.id === id);
+      if (p) applyPreset(p);
+    }
   }
   function toggle(id: ProviderId) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -202,12 +218,12 @@ export default function Home() {
       {/* Idea */}
       <section className="panel idea">
         <div className="row"><label className="lbl" htmlFor="idea">Idea</label><span className="modepill">{mode === "image" ? "Image" : "Text"}</span></div>
-        <textarea id="idea" rows={4} value={idea} onChange={(e) => setIdea(e.target.value)}
+        <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)}
           placeholder="Dump the rough idea. Sharpen it into a brief, or send it straight out." />
 
         <div className="chips">
           {PRESETS.map((p) => (
-            <button key={p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}>{p.label}</button>
+            <button key={p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}>{p.label}{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
           ))}
         </div>
 
@@ -219,7 +235,7 @@ export default function Home() {
               <button key={p.id} disabled={disabled}
                 className={`chip model ${p.id} ${selected.includes(p.id) && !disabled ? "on" : ""}`}
                 onClick={() => toggle(p.id)} title={p.model}>
-                <i className="dot" />{p.label}{why && <small> · {why}</small>}
+                <i className={`mono ${p.id}`}>{MONO[p.id]}</i>{p.label}{why && <small> · {why}</small>}
               </button>
             );
           })}
@@ -264,7 +280,7 @@ export default function Home() {
           {Object.entries(results).map(([pid, r]) => (
             <article key={pid} className="card">
               <div className="cardhead">
-                <strong><i className={`dot ${pid}`} />{label(pid as ProviderId)}</strong>
+                <strong><i className={`mono ${pid}`}>{MONO[pid as ProviderId]}</i>{label(pid as ProviderId)}</strong>
                 {r !== "loading" && <small>{r.model} · {(r.ms / 1000).toFixed(1)}s</small>}
                 {r !== "loading" && r.text && <CopyBtn text={r.text} label="Copy" />}
               </div>
