@@ -177,7 +177,9 @@ export default function Home() {
             <option value="__new">+ New project…</option>
           </select>
           {Object.keys(results).length > 0 && (
-            <button className="ghost small" onClick={() => { setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>New</button>
+            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
           )}
           <button className="iconbtn" aria-label="History" onClick={() => setShowHistory((v) => !v)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
