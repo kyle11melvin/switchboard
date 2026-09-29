@@ -62,15 +62,23 @@ Real disagreements and which side is better supported.
 
 ## Best parts
 Someone else will write the final answer from this section alone, without seeing the answers. So it must carry everything worth keeping.
-Give one sub-heading per answer ("### Answer A"). Under it, list every part worth using: the strongest lines, ideas, structures, facts and sources. Quote strong wording exactly. Where exactness matters (code, numbers, names, guideline sections, citations) copy it in full. Leave out anything you flagged.
-Look hard at the weaker answers: a weak answer often has one line or idea the strong one lacks. If an answer truly has nothing the others don't do better, write "Nothing worth taking" and the reason in a few words.`;
+
+The final answer will be ONE answer, not several options. If the answers each offered several options or versions, treat every option as raw material for that one answer.
+
+Work piece by piece, not answer by answer:
+1. List the pieces the one final answer needs (for example: opening hook, each main point, call to action, caption; or for code: each function or step).
+2. Give each piece a sub-heading ("### Opening hook"). Under it, compare what every answer offered for that piece and quote the best version exactly, with its label: - Answer B: "quoted text". Add a runner-up from a different answer when it has something the winner lacks.
+3. Judge each piece on its own. The strongest answer overall does not win every piece. A weak answer often has the best single line.
+
+Where exactness matters (code, numbers, names, guideline sections, citations) copy it in full. Leave out anything you flagged.
+End with a sub-heading "### Not used" listing any answer that contributed nothing, with the reason in a few words.`;
 
 export const WRITE_SYSTEM = `You write the final answer to a brief. You have the brief and a list of the best parts from several anonymous answers, labelled Answer A, Answer B, and so on. You have not seen the answers themselves.
 
 Write a new answer that is better than any one of them could be. Draw on every answer that has something worth taking. Do not lean on a single answer when others offer something it lacks. Use your own judgment on order and wording, and keep the exact wording of a quoted line when it is already the best way to say it.
 
 Rules:
-- Give ONE final answer, never a menu of options or versions, even if the brief asked the models for several. Choose or merge, and commit.
+- Give ONE final answer, never a menu of options or versions. The brief may ask for "2-3 options": that instruction was for the models, to give you more to choose from. It does not apply to you. Choose or merge, and commit to one.
 - No preamble, no notes about tone or how to pick, no recap of what you did.
 - As short as the deliverable allows.
 - Never use anything listed under DO NOT USE.
@@ -95,5 +103,5 @@ export function judgeUserPrompt(brief: string, answers: { letter: string; text: 
 }
 
 export function writeUserPrompt(brief: string, bestParts: string, redFlags: string) {
-  return `# BRIEF\n${brief}\n\n# BEST PARTS\n${bestParts}\n\n# DO NOT USE\n${redFlags || "None."}`;
+  return `# BRIEF (written for the models; where it asks for several options, you deliver one)\n${brief}\n\n# BEST PARTS\n${bestParts}\n\n# DO NOT USE\n${redFlags || "None."}\n\n# REMINDER\nWrite exactly one final answer, built piece by piece from the best parts above. No "Option 1 / Option 2". No notes before or after it.`;
 }

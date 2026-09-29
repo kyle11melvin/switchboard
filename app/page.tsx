@@ -477,16 +477,9 @@ export default function Home() {
                 )
                 : (
                   <>
-                    {r.images?.map((src, i) => {
-                      // A hosted image can't be force-downloaded from another site, so open it in a new tab instead of leaving the app.
-                      const inline = src.startsWith("data:");
-                      return (
-                        <a key={i} href={src} className="imgwrap" {...(inline ? { download: `${pid}-${i + 1}.png` } : { target: "_blank", rel: "noreferrer" })}>
-                          <img src={src} decoding="async" alt={`Image ${i + 1} from ${label(pid as ProviderId)}`} />
-                          <span>{inline ? "Tap to download" : "Tap to open full size"}</span>
-                        </a>
-                      );
-                    })}
+                    {r.images?.map((src, i) => (
+                      <ResultImage key={i} src={src} name={`switchboard-${pid}-${i + 1}`} alt={`Image ${i + 1} from ${label(pid as ProviderId)}`} />
+                    ))}
                     {!r.text && !r.images?.length && <p className="muted">Images aren't kept in history. Send it again to redraw.</p>}
                     {r.text && <div className="md"><Markdown text={r.text} /></div>}
                     {r.citations && r.citations.length > 0 && (
@@ -598,6 +591,56 @@ function SyncLine({ status, onRetry }: { status: import("./useSync").SyncStatus;
     : status.state === "synced" ? `Synced across your devices at ${new Date(status.at).toLocaleTimeString(undefined, { timeStyle: "short" })}`
     : "Syncing…";
   return <div className="syncline" role="status"><span>{text}</span></div>;
+}
+
+// A generated image, with a way to keep it.
+// A plain download link does nothing inside a home-screen app on iPhone, so saving goes through the
+// phone's share sheet ("Save Image") where there is one, and falls back to a normal download elsewhere.
+function ResultImage({ src, name, alt }: { src: string; name: string; alt: string }) {
+  const file = useRef<File | null>(null);
+  const [note, setNote] = useState("");
+  // Get the file ready ahead of the tap: the share sheet only opens if it's asked for straight away.
+  useEffect(() => {
+    let live = true;
+    file.current = null;
+    fetch(src).then((r) => r.blob()).then((b) => {
+      if (!live) return;
+      const type = b.type && b.type.startsWith("image/") ? b.type : "image/png";
+      file.current = new File([b], `${name}.${type.split("/")[1].replace("jpeg", "jpg").replace("svg+xml", "svg")}`, { type });
+    }).catch(() => { /* a hosted image that can't be fetched: the button opens it instead */ });
+    return () => { live = false; };
+  }, [src, name]);
+
+  async function keep() {
+    setNote("");
+    const f = file.current;
+    try {
+      if (f && navigator.canShare?.({ files: [f] })) { await navigator.share({ files: [f] }); return; }
+      if (f) {
+        const url = URL.createObjectURL(f);
+        const a = document.createElement("a");
+        a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+        setNote("Saved to your downloads.");
+        return;
+      }
+      window.open(src, "_blank", "noopener");
+      setNote("Opened in a new tab. Save it from there.");
+    } catch (e: any) {
+      if (e?.name === "AbortError") return; // closed the share sheet without choosing
+      setNote("Couldn't save it. Press and hold the image, then choose Save.");
+    }
+  }
+
+  return (
+    <figure className="imgwrap">
+      <img src={src} decoding="async" alt={alt} onClick={keep} />
+      <figcaption>
+        <button className="ghost small" onClick={keep}>Save image</button>
+        <span role="status">{note || "Or press and hold the image."}</span>
+      </figcaption>
+    </figure>
+  );
 }
 
 // Three grey lines standing in for text that's on its way.

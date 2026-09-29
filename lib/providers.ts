@@ -163,6 +163,22 @@ export async function runText(id: ProviderId, system: string, prompt: string): P
 
 const IMAGE_PROMPT_SYSTEM = `You cannot generate images, so instead write ONE production-ready image-generation prompt for the idea. Output only the prompt (60-120 words): subject, composition, lens/lighting, style, mood, aspect ratio, and "no text" unless text is requested. Then on a new line add "Negative: " with 5-8 things to avoid.`;
 
+// Some providers hand back a link instead of the picture. Links expire, and the browser can't save
+// a picture from another site, so fetch it here and pass the picture itself along.
+async function embed(src: string): Promise<string> {
+  if (!/^https:\/\//i.test(src)) return src;
+  try {
+    const res = await fetch(src, { signal: AbortSignal.timeout(20_000) });
+    const type = res.headers.get("content-type") || "";
+    if (!res.ok || !type.startsWith("image/")) return src;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.length > 12_000_000) return src;
+    return `data:${type.split(";")[0]};base64,${bytes.toString("base64")}`;
+  } catch {
+    return src;
+  }
+}
+
 export async function runImage(id: ProviderId, prompt: string, styleNote?: string): Promise<RunResult> {
   const t0 = Date.now();
   const def = PROVIDERS[id];
@@ -177,9 +193,12 @@ export async function runImage(id: ProviderId, prompt: string, styleNote?: strin
     const body: Record<string, unknown> = { model, prompt, n: 1 };
     if (id === "openai") body.size = process.env.OPENAI_IMAGE_SIZE || "1024x1024";
     const data = await postJSON(url, { authorization: `Bearer ${key(id)}` }, body);
-    const images: string[] = (data?.data ?? [])
-      .map((d: any) => (d.b64_json ? `data:image/png;base64,${d.b64_json}` : d.url))
-      .filter(Boolean);
+    const images: string[] = await Promise.all(
+      (data?.data ?? [])
+        .map((d: any) => (d.b64_json ? `data:image/png;base64,${d.b64_json}` : d.url))
+        .filter(Boolean)
+        .map(embed),
+    );
     if (!images.length) throw new Error("No image returned");
     const revised = data?.data?.[0]?.revised_prompt;
     return { provider: id, model, images, text: revised ? `Revised prompt: ${revised}` : undefined, ms: Date.now() - t0 };

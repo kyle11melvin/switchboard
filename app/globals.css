@@ -234,9 +234,10 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .cardhead small { font-variant-numeric: tabular-nums; color: var(--muted); margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; }
 .cites { font-size: 0.75rem; color: var(--muted); padding-left: 18px; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 .cites a { color: var(--muted); }
-.imgwrap { display: block; margin-top: 12px; text-decoration: none; }
-.imgwrap img { width: 100%; border-radius: var(--r-sm); display: block; }
-.imgwrap span { font-size: 0.75rem; color: var(--muted); }
+.imgwrap { display: block; margin: 12px 0 0; }
+.imgwrap img { width: 100%; border-radius: var(--r-sm); display: block; cursor: pointer; -webkit-touch-callout: default; }
+.imgwrap figcaption { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.imgwrap span { flex: 1 1 140px; min-width: 0; font-size: 0.75rem; color: var(--muted); }
 
 /* Markdown: answers and verdicts */
 .md { overflow-wrap: anywhere; font-size: 0.9375rem; }
