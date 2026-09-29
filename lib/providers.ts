@@ -68,12 +68,22 @@ function key(id: ProviderId): string {
   return k;
 }
 
+const TIMEOUT_MS = 100_000;
+
 async function postJSON(url: string, headers: Record<string, string>, body: unknown) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...headers },
-    body: JSON.stringify(body),
-  });
+  // Stop before the platform kills the function, so the card gets a readable error instead of a blank timeout.
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e: any) {
+    if (e?.name === "TimeoutError" || e?.name === "AbortError") throw new Error(`No reply after ${TIMEOUT_MS / 1000} seconds. Try again.`);
+    throw new Error("Couldn't reach this provider. It may be down. Try again in a moment.");
+  }
   const raw = await res.text();
   let data: any;
   try {

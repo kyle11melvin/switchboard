@@ -22,7 +22,44 @@ const LS = { projects: "sb.projects", history: "sb.history", project: "sb.projec
 const load = <T,>(k: string, fallback: T): T => {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
 };
-const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ } };
+const save = (k: string, v: unknown): boolean => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
+const STORAGE_FULL = "Couldn't save on this device. Browser storage is full or blocked, so this change will be lost on reload.";
+
+// Stored data can be missing, hand-edited or from an older version: keep only entries with the right shape.
+function loadProjects(): Project[] {
+  const v = load<unknown>(LS.projects, []);
+  const list = (Array.isArray(v) ? v : []).filter((p): p is Project => !!p && typeof p.id === "string" && typeof p.name === "string" && typeof p.locked === "string");
+  return [DEFAULT_PROJECTS[0], ...list.filter((p) => p.id !== "none")];
+}
+function loadHistory(): HistoryItem[] {
+  const v = load<unknown>(LS.history, []);
+  return (Array.isArray(v) ? v : [])
+    .filter((h) => !!h && typeof h.id === "string" && Array.isArray(h.results))
+    .map((h) => ({ ...h, idea: String(h.idea ?? ""), brief: String(h.brief ?? ""), mode: h.mode === "image" ? "image" : "text" }) as HistoryItem);
+}
+// History is the big one: if it doesn't fit, drop the oldest runs until it does.
+function saveHistory(list: HistoryItem[]): HistoryItem[] {
+  let n = list;
+  while (!save(LS.history, n) && n.length > 1) n = n.slice(0, Math.ceil(n.length / 2));
+  return n;
+}
+
+// One place for every server call, so failures read the same everywhere.
+async function api<T>(url: string, body?: unknown): Promise<T> {
+  let r: Response;
+  try {
+    r = await fetch(url, body === undefined ? undefined : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  } catch {
+    throw new Error(typeof navigator !== "undefined" && navigator.onLine === false ? "You're offline. Reconnect and try again." : "Couldn't reach Switchboard. Check your connection and try again.");
+  }
+  if (r.status === 401) { window.location.href = "/login"; throw new Error("You've been signed out. Taking you to the login page."); }
+  let d: any = null;
+  try { d = await r.json(); } catch { /* not JSON, e.g. a platform timeout page */ }
+  if (r.status === 504 || r.status === 408) throw new Error("Timed out waiting for the model. Try again.");
+  if (!r.ok) throw new Error(typeof d?.error === "string" && d.error ? d.error : `Server error (${r.status}). Try again.`);
+  if (d === null) throw new Error("Got an unreadable reply from the server. Try again.");
+  return d as T;
+}
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const DOMAIN: Record<ProviderId, string> = { openai: "openai.com", anthropic: "anthropic.com", xai: "x.ai", perplexity: "perplexity.ai", gemini: "gemini.google.com" };
@@ -56,15 +93,21 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
+  const [runPrompt, setRunPrompt] = useState("");
+  const [announce, setAnnounce] = useState(""); // read out by screen readers when answers and verdicts land
   const resultsRef = useRef<HTMLDivElement>(null);
+  const activeRun = useRef<string | null>(null); // results from any other run are stale and ignored
 
   useEffect(() => {
-    fetch("/api/status").then((r) => r.json()).then((d) => {
-      setProviders(d.providers); setBrain(d.brain); setJudgeWith(d.brain);
-    }).catch(() => setErr("Couldn't reach the server."));
-    setProjects(load(LS.projects, DEFAULT_PROJECTS));
-    setProjectId(load(LS.project, "none"));
-    setHistory(load(LS.history, []));
+    api<{ providers: ProviderInfo[]; brain: ProviderId }>("/api/status").then((d) => {
+      if (!Array.isArray(d.providers)) throw new Error("Couldn't load the list of AIs. Reload the page.");
+      setProviders(d.providers);
+      if (d.brain) { setBrain(d.brain); setJudgeWith(d.brain); }
+    }).catch((e) => setErr(e.message));
+    setProjects(loadProjects());
+    const pid = load<unknown>(LS.project, "none");
+    setProjectId(typeof pid === "string" ? pid : "none");
+    setHistory(loadHistory());
   }, []);
 
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
@@ -91,70 +134,80 @@ export default function Home() {
   function toggle(id: ProviderId) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
-  function updateProjects(next: Project[]) { setProjects(next); save(LS.projects, next); }
+  function updateProjects(next: Project[]) { setProjects(next); if (!save(LS.projects, next)) setErr(STORAGE_FULL); }
   function chooseProject(id: string) { setProjectId(id); save(LS.project, id); }
 
   async function sharpen() {
+    if (briefing || !idea.trim()) return;
     setErr(""); setBriefing(true);
     try {
-      const r = await fetch("/api/brief", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ idea, mode, project: projectCtx, presetNote: noteFor, brain }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
+      const d = await api<{ brief?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain });
+      if (!d.brief) throw new Error("The brief came back empty. Try again.");
       setBrief(d.brief);
-    } catch (e: any) { setErr(e.message); } finally { setBriefing(false); }
+    } catch (e: any) { setErr(`Sharpen failed: ${e.message}`); } finally { setBriefing(false); }
   }
 
   async function judge(finalResults: RunResult[], promptUsed: string, id: string) {
     const answers = finalResults.filter((r) => r.text && !r.error).map((r) => ({ label: `${label(r.provider)} (${r.model})`, text: r.text!, citations: r.citations }));
-    if (answers.length < 1) return;
-    setJudging(true); setVerdict("");
+    if (answers.length < 1 || judging) return;
+    setErr(""); setJudging(true); setVerdict("");
     try {
-      const r = await fetch("/api/judge", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ brief: promptUsed, answers, project: projectCtx, judge: judgeWith }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      setVerdict(d.verdict);
-      setHistory((h) => { const n = h.map((x) => (x.id === id ? { ...x, verdict: d.verdict } : x)); save(LS.history, n); return n; });
-    } catch (e: any) { setErr(`Judge failed: ${e.message}`); } finally { setJudging(false); }
+      const d = await api<{ verdict?: string }>("/api/judge", { brief: promptUsed, answers, project: projectCtx, judge: judgeWith });
+      if (!d.verdict) throw new Error("The verdict came back empty.");
+      const v = d.verdict;
+      // Keep the verdict with its run even if the screen has moved on to something else.
+      setHistory((h) => saveHistory(h.map((x) => (x.id === id ? { ...x, verdict: v } : x))));
+      if (activeRun.current !== id) return;
+      setVerdict(v); setAnnounce("Verdict ready.");
+    } catch (e: any) { if (activeRun.current === id) setErr(`Judge failed: ${e.message} Tap "Judge these answers" to try again.`); } finally { setJudging(false); }
+  }
+
+  async function runOne(provider: ProviderId, prompt: string, id: string): Promise<RunResult> {
+    let res: RunResult;
+    try {
+      const d = await api<Partial<RunResult>>("/api/run", { provider, mode, prompt, project: projectCtx, presetNote: noteFor });
+      res = { model: "", ms: 0, ...d, provider };
+      if (!res.error && !res.text && !res.images?.length) res.error = "Came back empty. Try again.";
+    } catch (e: any) {
+      res = { provider, model: "", error: e.message, ms: 0 };
+    }
+    if (activeRun.current === id) {
+      setResults((prev) => ({ ...prev, [provider]: res }));
+      setAnnounce(res.error ? `${label(provider)} failed: ${res.error}` : `${label(provider)} answered.`);
+    }
+    return res;
+  }
+
+  async function retry(provider: ProviderId) {
+    const id = runId;
+    if (!id || !runPrompt || results[provider] === "loading") return;
+    activeRun.current = id;
+    setResults((prev) => ({ ...prev, [provider]: "loading" }));
+    const res = await runOne(provider, runPrompt, id);
+    setHistory((h) => saveHistory(h.map((x) => (x.id === id ? { ...x, results: x.results.map((r) => (r.provider === provider ? { ...res, images: undefined } : r)) } : x))));
   }
 
   async function send() {
     const prompt = (brief || idea).trim();
     const targets = selected.filter((s) => byId[s]?.configured);
-    if (!prompt || !targets.length) return;
+    // Cmd+Enter lands here too, so guard against a second run while one is in flight.
+    if (!prompt || !targets.length || running) return;
     setErr(""); setVerdict("");
-    const id = uid(); setRunId(id);
+    const id = uid(); setRunId(id); setRunPrompt(prompt); activeRun.current = id;
+    setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 
-    const finished = await Promise.all(targets.map(async (provider) => {
-      let res: RunResult;
-      try {
-        const r = await fetch("/api/run", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ provider, mode, prompt, project: projectCtx, presetNote: noteFor }),
-        });
-        res = await r.json();
-      } catch (e: any) {
-        res = { provider, model: "", error: e.message, ms: 0 };
-      }
-      setResults((prev) => ({ ...prev, [provider]: res }));
-      return res;
-    }));
+    const finished = await Promise.all(targets.map((provider) => runOne(provider, prompt, id)));
 
     const item: HistoryItem = {
       id, at: Date.now(), idea, brief: prompt, mode, projectName: projectCtx?.name,
       // Images are big; keep history light by storing text only.
       results: finished.map((r) => ({ ...r, images: undefined })),
     };
-    setHistory((h) => { const n = [item, ...h].slice(0, 40); save(LS.history, n); return n; });
+    setHistory((h) => saveHistory([item, ...h].slice(0, 40)));
 
-    if (mode === "text" && autoJudge && finished.filter((r) => r.text && !r.error).length >= 2) {
+    if (activeRun.current === id && mode === "text" && autoJudge && finished.filter((r) => r.text && !r.error).length >= 2) {
       judge(finished, prompt, id);
     }
   }
@@ -162,7 +215,7 @@ export default function Home() {
   function openHistory(h: HistoryItem) {
     setIdea(h.idea); setBrief(h.brief === h.idea ? "" : h.brief); setMode(h.mode);
     setResults(Object.fromEntries(h.results.map((r) => [r.provider, r])));
-    setVerdict(h.verdict ?? ""); setRunId(h.id); setShowHistory(false);
+    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -174,30 +227,30 @@ export default function Home() {
   return (
     <main>
       <header className="top">
-        <div className="brand">Switchboard<span>one idea · every AI · one verdict</span></div>
+        <h1 className="brand">Switchboard<span>one idea · every AI · one verdict</span></h1>
         <div className="topright">
-          <select className="projpill" value={projectId} onChange={(e) => { const v = e.target.value; if (v === "__new") { const name = prompt("Project name?"); if (!name) return; const np = { id: uid(), name, locked: "" }; updateProjects([...projects, np]); chooseProject(np.id); setEditingProject(true); } else { chooseProject(v); setEditingProject(false); } }}>
+          <select className="projpill" aria-label="Project" value={projectId} onChange={(e) => { const v = e.target.value; if (v === "__new") { const name = prompt("Project name?")?.trim().slice(0, 60); if (!name) return; const np = { id: uid(), name, locked: "" }; updateProjects([...projects, np]); chooseProject(np.id); setEditingProject(true); } else { chooseProject(v); setEditingProject(false); } }}>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             <option value="__new">+ New project…</option>
           </select>
           {Object.keys(results).length > 0 && (
-            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           )}
-          <button className="iconbtn" aria-label="History" onClick={() => setShowHistory((v) => !v)}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            {history.length > 0 && <span className="badge">{history.length}</span>}
+          <button className="iconbtn" aria-label={history.length ? `History, ${history.length} run${history.length === 1 ? "" : "s"}` : "History"} aria-expanded={showHistory} onClick={() => setShowHistory((v) => !v)}>
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            {history.length > 0 && <span className="badge" aria-hidden="true">{history.length}</span>}
           </button>
         </div>
       </header>
 
       {showHistory && (
-        <section className="panel">
+        <section className="panel" aria-label="History">
           {history.length === 0 && <p className="muted">No runs yet.</p>}
           {history.map((h) => (
             <button key={h.id} className="hist" onClick={() => openHistory(h)}>
-              <span>{h.idea.slice(0, 90) || h.brief.slice(0, 90)}</span>
+              <span>{h.idea.trim().slice(0, 90) || h.brief.trim().slice(0, 90) || "Untitled run"}</span>
               <small>{new Date(h.at).toLocaleString()} · {h.results.map((r) => label(r.provider)).join(", ")}{h.verdict ? " · judged" : ""}{h.projectName ? ` · ${h.projectName}` : ""}</small>
             </button>
           ))}
@@ -209,14 +262,14 @@ export default function Home() {
 
       {project?.id !== "none" && (
         <section className="lockbar">
-          <button className="lockline" onClick={() => setEditingProject((v) => !v)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-            <span>{project.locked.trim() ? `${project.locked.split("\n").filter((l) => l.trim()).length} locked decisions ride along with every prompt` : "No locked decisions yet — tap to add"}</span>
+          <button className="lockline" aria-expanded={editingProject} onClick={() => setEditingProject((v) => !v)}>
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            <span>{project.locked.trim() ? (() => { const c = project.locked.split("\n").filter((l) => l.trim()).length; return `${c} locked decision${c === 1 ? " rides" : "s ride"} along with every prompt`; })() : "No locked decisions yet — tap to add"}</span>
             <span className="chev">{editingProject ? "Done" : "Edit"}</span>
           </button>
           {editingProject && (
             <div className="lockeditor">
-              <textarea rows={6} value={project.locked}
+              <textarea rows={6} value={project.locked} aria-label={`Locked decisions for ${project.name}, one per line`}
                 placeholder={"One per line. Every model and the judge treat these as settled.\ne.g. Single-file HTML, no framework\ne.g. Brand colors navy #1B2A4A / gold #C9A84C"}
                 onChange={(e) => updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: e.target.value } : p)))} />
               <button className="ghost small danger" onClick={() => {
@@ -234,9 +287,9 @@ export default function Home() {
         <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } }}
           placeholder="Dump the rough idea. Sharpen it into a brief, or send it straight out." />
 
-        <div className="chips">
+        <div className="chips" role="group" aria-label="Task type">
           {PRESETS.map((p) => (
-            <button key={p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}>{p.label}{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
+            <button key={p.id} aria-pressed={preset.id === p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}>{p.label}{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
           ))}
         </div>
 
@@ -244,18 +297,18 @@ export default function Home() {
           <p className="hint">No image-capable key yet (ChatGPT or Grok). The models below will write you a ready-to-paste image prompt instead.</p>
         )}
         {mode === "image" && (
-          <div className="chips styles">
+          <div className="chips styles" role="group" aria-label="Image style">
             {IMAGE_STYLES.map((st) => (
-              <button key={st.id} className={`chip sm ${imgStyle === st.id ? "on" : ""}`} onClick={() => setImgStyle(st.id)}>{st.label}</button>
+              <button key={st.id} aria-pressed={imgStyle === st.id} className={`chip sm ${imgStyle === st.id ? "on" : ""}`} onClick={() => setImgStyle(st.id)}>{st.label}</button>
             ))}
           </div>
         )}
-        <div className="chips models">
+        <div className="chips models" role="group" aria-label="AIs to send to">
           {providers.map((p) => {
             const disabled = !p.configured;
             const why = !p.configured ? "no key" : mode === "image" && !p.canImage ? "prompt only" : "";
             return (
-              <button key={p.id} disabled={disabled}
+              <button key={p.id} disabled={disabled} aria-pressed={selected.includes(p.id) && !disabled}
                 className={`chip model ${p.id} ${selected.includes(p.id) && !disabled ? "on" : ""}`}
                 onClick={() => toggle(p.id)} title={p.model}>
                 <Logo id={p.id} />{p.label}{why && <small> · {why}</small>}
@@ -266,7 +319,7 @@ export default function Home() {
         {mode === "text" && (
           <div className="row judgeRow">
             <label className="switch"><input type="checkbox" checked={autoJudge} onChange={(e) => setAutoJudge(e.target.checked)} /><span className="track"><span className="knob" /></span> Auto-judge</label>
-            <select className="inline" value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
+            <select className="inline" aria-label="Judge model" value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
               {providers.filter((p) => p.configured).map((p) => <option key={p.id} value={p.id}>by {p.label}</option>)}
             </select>
           </div>
@@ -278,23 +331,24 @@ export default function Home() {
           <details open={Object.keys(results).length === 0}>
             <summary className="row"><span className="lbl">Brief · edit freely, this is what gets sent</span>
               <button className="ghost small" onClick={(e) => { e.preventDefault(); setBrief(""); }}>Discard</button></summary>
-            <textarea rows={10} value={brief} onChange={(e) => setBrief(e.target.value)} />
+            <textarea rows={10} aria-label="Brief" value={brief} onChange={(e) => setBrief(e.target.value)} />
           </details>
         </section>
       )}
 
-      {err && <div className="error">{err}</div>}
+      {err && <div className="error" role="alert">{err}</div>}
+      <div className="sr" role="status" aria-live="polite">{announce}</div>
 
       <div ref={resultsRef} className="anchor" />
 
       {/* Verdict first — it's the thing you actually use */}
       {(judging || verdict) && (
-        <section className="panel verdict">
+        <section className="panel verdict" aria-busy={judging}>
           <div className="row">
-            <label className="lbl">Verdict {judging ? "" : `· judged by ${label(judgeWith)}`}</label>
+            <h2 className="lbl">Verdict {judging ? "" : `· judged by ${label(judgeWith)}`}</h2>
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
-          {judging ? <div className="skeleton"><span /><span /><span /></div> : (() => {
+          {judging ? <div className="skeleton" aria-hidden="true"><span /><span /><span /></div> : (() => {
             const { best, rest, flags } = splitVerdict(verdict);
             return (
               <>
@@ -315,23 +369,33 @@ export default function Home() {
       {Object.keys(results).length > 0 && (
         <section className={`grid n${Object.keys(results).length}`}>
           {Object.entries(results).map(([pid, r]) => (
-            <article key={pid} className="card">
+            <article key={pid} className="card" aria-label={label(pid as ProviderId)} aria-busy={r === "loading"}>
               <div className="cardhead">
                 <strong><Logo id={pid as ProviderId} />{label(pid as ProviderId)}</strong>
                 {r !== "loading" && <small>{r.model} · {(r.ms / 1000).toFixed(1)}s</small>}
                 {r !== "loading" && r.promptOnly && <span className="tag">prompt</span>}
                 {r !== "loading" && r.text && <CopyBtn text={r.text} label={r.promptOnly ? "Copy prompt" : "Copy"} />}
               </div>
-              {r === "loading" ? <div className="skeleton"><span /><span /><span /></div>
-                : r.error ? <p className="error">{r.error}</p>
+              {r === "loading" ? <div className="skeleton" aria-hidden="true"><span /><span /><span /></div>
+                : r.error ? (
+                  <div className="error carderr">
+                    <span>{r.error}</span>
+                    {runPrompt && <button className="ghost small" onClick={() => retry(pid as ProviderId)}>Try again</button>}
+                  </div>
+                )
                 : (
                   <>
-                    {r.images?.map((src, i) => (
-                      <a key={i} href={src} download={`${pid}-${i + 1}.png`} className="imgwrap">
-                        <img src={src} alt={`${label(pid as ProviderId)} image`} />
-                        <span>Tap to download</span>
-                      </a>
-                    ))}
+                    {r.images?.map((src, i) => {
+                      // A hosted image can't be force-downloaded from another site, so open it in a new tab instead of leaving the app.
+                      const inline = src.startsWith("data:");
+                      return (
+                        <a key={i} href={src} className="imgwrap" {...(inline ? { download: `${pid}-${i + 1}.png` } : { target: "_blank", rel: "noreferrer" })}>
+                          <img src={src} alt={`Image ${i + 1} from ${label(pid as ProviderId)}`} />
+                          <span>{inline ? "Tap to download" : "Tap to open full size"}</span>
+                        </a>
+                      );
+                    })}
+                    {!r.text && !r.images?.length && <p className="muted">Images aren't kept in history. Send it again to redraw.</p>}
                     {r.text && <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{r.text}</ReactMarkdown></div>}
                     {r.citations && r.citations.length > 0 && (
                       <ol className="cites">{r.citations.map((c, i) => <li key={i}><a href={c} target="_blank" rel="noreferrer">{c.replace(/^https?:\/\//, "").slice(0, 60)}</a></li>)}</ol>
@@ -391,10 +455,11 @@ function Logo({ id }: { id: ProviderId }) {
 }
 
 function CopyBtn({ text, label }: { text: string; label: string }) {
-  const [ok, setOk] = useState(false);
+  const [ok, setOk] = useState("");
   return (
     <button className="ghost small" onClick={async () => {
-      try { await navigator.clipboard.writeText(text); setOk(true); setTimeout(() => setOk(false), 1200); } catch { /* ignore */ }
-    }}>{ok ? "Copied ✓" : label}</button>
+      try { await navigator.clipboard.writeText(text); setOk("Copied ✓"); } catch { setOk("Copy failed"); }
+      setTimeout(() => setOk(""), 1600);
+    }}><span aria-live="polite">{ok || label}</span></button>
   );
 }
