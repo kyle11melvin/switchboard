@@ -68,7 +68,7 @@ const MONO: Record<ProviderId, string> = { openai: "C", anthropic: "A", xai: "X"
 
 // The markdown renderer is the heaviest code on the page and isn't needed until an answer lands, so it loads separately.
 const loadMarkdown = () => import("./Markdown");
-const Markdown = dynamic(loadMarkdown, { ssr: false, loading: () => <div className="skeleton" aria-hidden="true"><span /><span /><span /></div> });
+const Markdown = dynamic(loadMarkdown, { ssr: false, loading: () => <Skeleton /> });
 
 const DEFAULT_PROJECTS: Project[] = [{ id: "none", name: "No project", locked: "" }];
 
@@ -357,7 +357,7 @@ export default function Home() {
             <h2 className="lbl">Verdict {judging ? "" : `· judged by ${label(judgeWith)}`}</h2>
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
-          {judging ? <div className="skeleton" aria-hidden="true"><span /><span /><span /></div> : (() => {
+          {judging ? <Skeleton /> : (() => {
             const { best, rest, flags } = verdictParts;
             return (
               <>
@@ -385,7 +385,7 @@ export default function Home() {
                 {r !== "loading" && r.promptOnly && <span className="tag">prompt</span>}
                 {r !== "loading" && r.text && <CopyBtn text={r.text} label={r.promptOnly ? "Copy prompt" : "Copy"} />}
               </div>
-              {r === "loading" ? <div className="skeleton" aria-hidden="true"><span /><span /><span /></div>
+              {r === "loading" ? <Skeleton />
                 : r.error ? (
                   <div className="error carderr">
                     <span>{r.error}</span>
@@ -469,6 +469,11 @@ function Logo({ id }: { id: ProviderId }) {
   if (src === "") return <i className={`mono ${id}`}>{MONO[id]}</i>;
   if (src === null) return <span className="logo" aria-hidden="true" />;
   return <img className={`logo ${ok ? "ok" : ""}`} src={src} alt="" decoding="async" onLoad={() => setOk(true)} onError={() => setSrc("")} />;
+}
+
+// Three grey lines standing in for text that's on its way.
+function Skeleton() {
+  return <div className="skeleton" aria-hidden="true"><span /><span /><span /></div>;
 }
 
 function CopyBtn({ text, label }: { text: string; label: string }) {
