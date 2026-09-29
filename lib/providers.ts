@@ -38,7 +38,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
     label: "Grok",
     keyEnv: "XAI_API_KEY",
     textModel: () => process.env.XAI_MODEL || "grok-4",
-    imageModel: () => process.env.XAI_IMAGE_MODEL || "grok-2-image",
+    imageModel: () => process.env.XAI_IMAGE_MODEL || "grok-imagine-image-2.0",
   },
   perplexity: {
     label: "Perplexity",
@@ -165,7 +165,6 @@ export async function runImage(id: ProviderId, prompt: string): Promise<RunResul
     const url =
       id === "openai" ? "https://api.openai.com/v1/images/generations" : "https://api.x.ai/v1/images/generations";
     const body: Record<string, unknown> = { model, prompt, n: 1 };
-    if (id === "xai") body.response_format = "b64_json";
     if (id === "openai") body.size = process.env.OPENAI_IMAGE_SIZE || "1024x1024";
     const data = await postJSON(url, { authorization: `Bearer ${key(id)}` }, body);
     const images: string[] = (data?.data ?? [])
