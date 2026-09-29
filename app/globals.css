@@ -89,6 +89,10 @@ a { text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
 ::selection { background: rgba(var(--accent-rgb), 0.35); }
 .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
+/* In the home-screen app the page scrolls underneath the phone's clock and signal icons.
+   A solid strip behind them keeps the two apart. It has no height in a normal browser. */
+body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 40; pointer-events: none; }
+
 /* Header */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0 18px; }
 .brand { min-width: 0; flex: 1; margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.625rem; letter-spacing: -0.02em; color: var(--accent2); line-height: 1.1; }
@@ -204,6 +208,13 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .anchor { scroll-margin-top: 12px; }
 .verdict { border-color: rgba(var(--accent-rgb), 0.6); background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.02)), var(--panel); }
 .verdict .lbl { color: var(--accent2); }
+/* Where the combined answer came from: quiet, directly under it */
+.sources { margin-top: 10px; color: var(--muted); }
+.sources .lbl { color: var(--muted); }
+.sources .md { font-size: 0.875rem; }
+.sources .md ul { margin: 4px 0 0; padding-left: 18px; }
+.sources .md li { margin: 2px 0; }
+.sources .md strong { color: var(--text); font-weight: 700; }
 .grading { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 .grading summary { min-height: 28px; cursor: pointer; font-weight: 700; font-size: 0.8125rem; color: var(--muted); list-style: none; display: flex; align-items: center; gap: 8px; }
 .grading summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform 0.15s; }
@@ -251,6 +262,9 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .best p:last-child { margin-bottom: 0; }
 
 /* History */
+.syncline { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--line); font-size: 0.8125rem; color: var(--muted); }
+.syncline span { flex: 1 1 200px; min-width: 0; }
+.showall { margin: 12px 8px 0 0; }
 .hist { display: block; width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 12px 2px; font-weight: 600; }
 .hist span { overflow-wrap: anywhere; }
 .hist small { display: block; color: var(--muted); font-size: 0.75rem; font-weight: 500; margin-top: 2px; }

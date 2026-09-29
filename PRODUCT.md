@@ -19,7 +19,7 @@ Switchboard takes one rough idea through four steps:
 1. **Sharpen** the idea into a tight brief (goal, context, deliverable, constraints, done-criteria). The brief is editable before sending.
 2. **Send** the brief to the AIs he picks.
 3. **Compare** the answers side by side.
-4. **Judge**: one model grades every answer and returns a verdict, a scorecard, red flags with quoted receipts, where the models agree and split, and a best combined answer ready to copy.
+4. **Judge**: one model grades every answer blind and returns a verdict, a scorecard, red flags with quoted receipts, where the models agree and split, a best combined answer ready to copy, and a note on what it took from each answer.
 
 Success means the best combined answer is usable as-is, and anything fabricated or contradicting a locked decision was flagged before he relied on it.
 
@@ -33,7 +33,7 @@ The judge is the gatekeeper step Kyle otherwise does by hand. It grades answers 
 - **Keyword prediction** picks a preset as he types, until he picks one by hand.
 - **Projects and locked decisions**: each project holds a list of settled facts, one per line, that rides along with every prompt and with the judge.
 - **Image mode**: ChatGPT and Grok draw side by side. Models that cannot draw write a ready-to-paste image prompt instead. Image style templates: Auto, Poster / flyer, Product shot, Lifestyle photo, Illustration, UI mockup, Social.
-- **History**: the last 40 runs, text only (images are not stored).
+- **History**: the last 200 runs, text only (images are not stored).
 - **Providers**: ChatGPT, Claude and Grok are keyed. Perplexity and Gemini are wired but have no key, so they show as "no key" and cannot be selected.
 - **Brain**: the sharpen step and the default judge run on Claude unless `BRAIN_PROVIDER` says otherwise. The judge model can be changed per run.
 
@@ -44,12 +44,12 @@ The judge is the gatekeeper step Kyle otherwise does by hand. It grades answers 
 - **Deploy**: Vercel, from GitHub `main`. A push to `main` deploys to production automatically. Live at switchboard-two-puce.vercel.app.
 - **Configuration**: API keys are Vercel environment variables. Model IDs can be overridden with `*_MODEL` environment variables without a code change.
 - **Password gate**: a login page backed by `APP_PASSWORD`, enforced in `middleware.ts`. It must stay, because anyone with the URL could otherwise spend the API credits.
-- **Storage**: projects, locked decisions and history live in browser localStorage, so they are per device and do not sync between phone and laptop. This is a known v2 gap.
+- **Storage**: projects, locked decisions and history sync between devices through an Upstash Redis store, reached with plain fetch. Each browser keeps its own copy so the app works offline. The most recent change wins. Generated images are not stored.
 - **House rules** (`HOUSE_RULES` in `lib/prompts.ts`) are sent with every answer and to the judge. A house-rule violation is always a red flag.
   - Kyle is not a veteran: no military-discount, "as a veteran myself", or personal military-service language on his behalf.
   - No promises of rates, lock timing, approval, or savings.
   - Mortgage guidance must cite the governing source: HUD Handbook 4000.1 (FHA), Fannie Mae Selling Guide, VA Pamphlet 26-7, or the applicable Non-QM investor guideline. A model that is unsure of a section must say so rather than invent one.
-- **Not built (v2 ideas)**: decision log that appends accepted verdicts to locked decisions, server-side storage, follow-up rounds, a cost meter per run.
+- **Not built (v2 ideas)**: decision log that appends accepted verdicts to locked decisions, follow-up rounds, a cost meter per run.
 
 ## Brand Commitments
 
@@ -70,6 +70,7 @@ The judge is the gatekeeper step Kyle otherwise does by hand. It grades answers 
 
 1. **The verdict is the product.** The best combined answer comes first, because it is what actually gets used. Grading detail supports it.
 2. **Receipts over opinions.** Every red flag quotes the text it objects to.
+   The judge never sees which model wrote which answer. Answers reach it shuffled and labelled A, B, C, and the names are restored afterwards.
 3. **Locked decisions are settled.** Models and the judge do not contradict or relitigate them, and must say so when an answer conflicts with one.
 4. **Say "not sure" rather than guess.** Invented facts, APIs, citations and guideline sections are the failure this tool exists to catch.
 5. **One person, low friction.** From rough idea to answers in as few steps as possible, on a phone as well as a laptop.

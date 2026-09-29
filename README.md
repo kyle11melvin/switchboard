@@ -6,10 +6,10 @@ One idea → sharpened brief → pick your AIs → side-by-side answers → one 
 
 - **Sharpen** — turns a rough idea into a tight brief (goal, deliverable, constraints, done-criteria). Edit it before sending.
 - **Presets** — routing defaults by task type (`lib/presets.ts`): Creative image → ChatGPT + Grok, Code → Claude + ChatGPT, Research → Perplexity + Claude + Gemini, Loan scenario, Gut check (all). Toggle any model on/off after picking a preset.
-- **Projects + locked decisions** — per-project list of settled facts that gets sent with every prompt *and* to the judge. Stored in your browser.
-- **Judge** — one model grades every answer: scorecard, red flags with quoted receipts, where they agree/split, and a best combined answer you can copy.
+- **Projects + locked decisions** — per-project list of settled facts that gets sent with every prompt *and* to the judge. Synced between your devices.
+- **Judge** — one model grades every answer blind (shuffled, labelled A/B/C, names restored afterwards; see `lib/blind.ts`): scorecard, red flags with quoted receipts, where they agree/split, a best combined answer you can copy, and what it took from each answer.
 - **Image mode** — ChatGPT and Grok generate images side by side; tap to download.
-- **History** — last 40 runs, in your browser.
+- **History** — last 200 runs, synced between your devices.
 
 ## Deploy (GitHub → Vercel, ~10 minutes)
 
@@ -38,6 +38,17 @@ Model IDs drift. Override without touching code:
 `OPENAI_MODEL`, `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_SIZE`, `ANTHROPIC_MODEL`, `XAI_MODEL`, `XAI_IMAGE_MODEL`, `PERPLEXITY_MODEL`, `GEMINI_MODEL`, `BRAIN_PROVIDER` (which model does the sharpen + default judge; default `anthropic`).
 
 If a card shows a `404`/`model not found` error, that's the model ID — set the override to a current one.
+
+## Sync between devices
+
+Projects, locked decisions and run history sync between your phone and laptop.
+
+- **Where it's stored:** an Upstash Redis store connected through the Vercel Marketplace. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` to the project. Without them the app still works, and says "Sync is off".
+- **When it syncs:** when the app opens, when you come back to it, about a second after any change, and once a minute while it's on screen.
+- **The rule:** the most recently changed copy of a project or run wins. Deleting a project or clearing history applies to every device.
+- **Offline:** each device keeps its own copy in the browser, so the app opens and works offline. Changes go up when the connection returns.
+- **Limits:** the newest 200 runs are kept. Images are not stored.
+- **Code:** `lib/merge.ts` (the rules), `lib/store.ts` (storage), `app/api/sync` (the endpoint), `app/useSync.ts` (the browser side).
 
 ## Login protection
 
@@ -71,6 +82,5 @@ middleware.ts         password gate
 ## v2 ideas (not built)
 
 - Decision log: accept a verdict → append to the project's locked decisions automatically
-- Server-side storage (projects/history sync across phone + laptop)
 - Follow-up rounds: send the judge's questions back to the models
 - Cost meter per run

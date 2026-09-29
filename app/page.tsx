@@ -1,20 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { PRESETS, type Preset } from "@/lib/presets";
 import { predictPreset } from "@/lib/predict";
 import { IMAGE_STYLES } from "@/lib/imageStyles";
+import { HISTORY_LIMIT, isProject, isRun, mergeNewest, tidyRuns } from "@/lib/merge";
+import { useSync } from "./useSync";
 
 type ProviderId = "openai" | "anthropic" | "xai" | "perplexity" | "gemini";
 type Mode = "text" | "image";
 
 interface ProviderInfo { id: ProviderId; label: string; configured: boolean; canImage: boolean; model: string }
 interface RunResult { provider: ProviderId; model: string; text?: string; images?: string[]; citations?: string[]; promptOnly?: boolean; error?: string; ms: number }
-interface Project { id: string; name: string; locked: string }
+// updatedAt and deleted exist for syncing: the newest copy wins, and a deleted project leaves a marker behind.
+interface Project { id: string; name: string; locked: string; updatedAt?: number; deleted?: boolean }
 interface HistoryItem {
   id: string; at: number; idea: string; brief: string; mode: Mode; projectName?: string;
-  results: RunResult[]; verdict?: string;
+  results: RunResult[]; verdict?: string; updatedAt?: number;
 }
 
 const LS = { projects: "sb.projects", history: "sb.history", project: "sb.project" };
@@ -28,7 +31,8 @@ const STORAGE_FULL = "Couldn't save on this device. Browser storage is full or b
 function loadProjects(): Project[] {
   const v = load<unknown>(LS.projects, []);
   const list = (Array.isArray(v) ? v : []).filter((p): p is Project => !!p && typeof p.id === "string" && typeof p.name === "string" && typeof p.locked === "string");
-  return [DEFAULT_PROJECTS[0], ...list.filter((p) => p.id !== "none")];
+  // Projects from before syncing existed get a starting timestamp, so they're sent up once.
+  return [DEFAULT_PROJECTS[0], ...list.filter((p) => p.id !== "none").map((p) => ({ ...p, updatedAt: p.updatedAt ?? 1 }))];
 }
 function loadHistory(): HistoryItem[] {
   const v = load<unknown>(LS.history, []);
@@ -36,11 +40,14 @@ function loadHistory(): HistoryItem[] {
     .filter((h) => !!h && typeof h.id === "string" && Array.isArray(h.results))
     .map((h) => ({ ...h, idea: String(h.idea ?? ""), brief: String(h.brief ?? ""), mode: h.mode === "image" ? "image" : "text" }) as HistoryItem);
 }
-// History is the big one: if it doesn't fit, drop the oldest runs until it does.
+// History is the big one. The screen keeps every run; this device stores as many of the newest as fit.
+// When some didn't fit, the next sync fetches the full list again.
+const historyCache = { partial: false };
 function saveHistory(list: HistoryItem[]): HistoryItem[] {
   let n = list;
   while (!save(LS.history, n) && n.length > 1) n = n.slice(0, Math.ceil(n.length / 2));
-  return n;
+  historyCache.partial = n.length < list.length;
+  return list;
 }
 
 // One place for every server call, so failures read the same everywhere.
@@ -73,6 +80,8 @@ const MONO: Record<ProviderId, string> = { openai: "C", anthropic: "A", xai: "X"
 const loadMarkdown = () => import("./Markdown");
 const Markdown = dynamic(loadMarkdown, { ssr: false, loading: () => <Skeleton /> });
 
+const HISTORY_PAGE = 30; // runs listed before "Show all"
+
 const DEFAULT_PROJECTS: Project[] = [{ id: "none", name: "No project", locked: "" }];
 
 export default function Home() {
@@ -103,6 +112,8 @@ export default function Home() {
   const [err, setErr] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [runPrompt, setRunPrompt] = useState("");
   const [announce, setAnnounce] = useState(""); // read out by screen readers when answers and verdicts land
@@ -119,12 +130,22 @@ export default function Home() {
     const pid = load<unknown>(LS.project, "none");
     setProjectId(typeof pid === "string" ? pid : "none");
     setHistory(loadHistory());
+    setLoaded(true);
     // Fetch the renderer once the page has settled, so it's ready before the first answer arrives.
     const t = setTimeout(() => { loadMarkdown().catch(() => {}); }, 1200);
     return () => clearTimeout(t);
   }, []);
 
-  const project = projects.find((p) => p.id === projectId) ?? projects[0];
+  const applyPulled = useCallback((ps: Project[], rs: HistoryItem[], clearedAt: number) => {
+    const okProjects = ps.filter(isProject);
+    if (okProjects.length) setProjects((cur) => { const next = [DEFAULT_PROJECTS[0], ...mergeNewest(cur.filter((p) => p.id !== "none"), okProjects)]; save(LS.projects, next); return next; });
+    const usable = rs.filter((r) => isRun(r) && typeof r.idea === "string" && typeof r.brief === "string");
+    setHistory((h) => saveHistory(tidyRuns(mergeNewest(h, usable), clearedAt)));
+  }, []);
+  const sync = useSync<Project, HistoryItem>({ ready: loaded, projects, history, applyPulled, cacheIsPartial: () => historyCache.partial });
+
+  const shownProjects = projects.filter((p) => !p.deleted);
+  const project = shownProjects.find((p) => p.id === projectId) ?? shownProjects[0];
   const projectCtx = project && project.id !== "none" ? { name: project.name, locked: project.locked } : null;
   const styleNote = mode === "image" ? IMAGE_STYLES.find((x) => x.id === imgStyle)?.note : undefined;
   const noteFor = [preset.note, styleNote].filter(Boolean).join("\n\n") || undefined;
@@ -148,12 +169,12 @@ export default function Home() {
   function toggle(id: ProviderId) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
-  function updateProjects(next: Project[]) { setProjects(next); if (!save(LS.projects, next)) setErr(STORAGE_FULL); }
+  function updateProjects(next: Project[]) { setProjects(next); if (!save(LS.projects, next)) setErr(STORAGE_FULL); sync.syncSoon(); }
   function createProject(e: React.FormEvent) {
     e.preventDefault();
     const name = newName.trim().slice(0, 60);
     if (!name) return;
-    const np = { id: uid(), name, locked: "" };
+    const np = { id: uid(), name, locked: "", updatedAt: Date.now() };
     updateProjects([...projects, np]); chooseProject(np.id);
     setNaming(false); setNewName(""); setEditingProject(true);
   }
@@ -180,7 +201,8 @@ export default function Home() {
       if (!d.verdict) throw new Error("The verdict came back empty.");
       const v = d.verdict;
       // Keep the verdict with its run even if the screen has moved on to something else.
-      setHistory((h) => saveHistory(h.map((x) => (x.id === id ? { ...x, verdict: v } : x))));
+      setHistory((h) => saveHistory(h.map((x) => (x.id === id ? { ...x, verdict: v, updatedAt: Date.now() } : x))));
+      sync.syncSoon();
       if (activeRun.current !== id) return;
       setVerdict(v); setAnnounce("Verdict ready.");
     } catch (e: any) { if (activeRun.current === id) setErr(`Judge failed: ${e.message} Tap "Judge these answers" to try again.`); } finally { setJudging(false); }
@@ -208,7 +230,8 @@ export default function Home() {
     activeRun.current = id;
     setResults((prev) => ({ ...prev, [provider]: "loading" }));
     const res = await runOne(provider, runPrompt, id);
-    setHistory((h) => saveHistory(h.map((x) => (x.id === id ? { ...x, results: x.results.map((r) => (r.provider === provider ? { ...res, images: undefined } : r)) } : x))));
+    setHistory((h) => saveHistory(h.map((x) => (x.id === id ? { ...x, updatedAt: Date.now(), results: x.results.map((r) => (r.provider === provider ? { ...res, images: undefined } : r)) } : x))));
+    sync.syncSoon();
   }
 
   async function send() {
@@ -224,12 +247,14 @@ export default function Home() {
 
     const finished = await Promise.all(targets.map((provider) => runOne(provider, prompt, id)));
 
+    const now = Date.now();
     const item: HistoryItem = {
-      id, at: Date.now(), idea, brief: prompt, mode, projectName: projectCtx?.name,
+      id, at: now, updatedAt: now, idea, brief: prompt, mode, projectName: projectCtx?.name,
       // Images are big; keep history light by storing text only.
       results: finished.map((r) => ({ ...r, images: undefined })),
     };
-    setHistory((h) => saveHistory([item, ...h].slice(0, 40)));
+    setHistory((h) => saveHistory([item, ...h].slice(0, HISTORY_LIMIT)));
+    sync.syncSoon();
 
     if (activeRun.current === id && mode === "text" && autoJudge && finished.filter((r) => r.text && !r.error).length >= 2) {
       judge(finished, prompt, id);
@@ -255,7 +280,7 @@ export default function Home() {
         <h1 className="brand">Switchboard<span>one idea · every AI · one verdict</span></h1>
         <div className="topright">
           <select className="projpill" aria-label="Project" value={projectId} onChange={(e) => { const v = e.target.value; if (v === "__new") { setNaming(true); } else { setNaming(false); chooseProject(v); setEditingProject(false); } }}>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {shownProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             <option value="__new">+ New project…</option>
           </select>
           {Object.keys(results).length > 0 && (
@@ -272,15 +297,19 @@ export default function Home() {
 
       {showHistory && (
         <section className="panel" aria-label="History">
+          <SyncLine status={sync.status} onRetry={sync.syncNow} />
           {history.length === 0 && <p className="muted">No runs yet.</p>}
-          {history.map((h) => (
+          {(showAllHistory ? history : history.slice(0, HISTORY_PAGE)).map((h) => (
             <button key={h.id} className="hist" onClick={() => openHistory(h)}>
               <span>{h.idea.trim().slice(0, 90) || h.brief.trim().slice(0, 90) || "Untitled run"}</span>
               <small>{new Date(h.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · {h.results.map((r) => label(r.provider)).join(", ")}{h.verdict ? " · judged" : ""}{h.projectName ? ` · ${h.projectName}` : ""}</small>
             </button>
           ))}
+          {history.length > HISTORY_PAGE && !showAllHistory && (
+            <button className="ghost small showall" onClick={() => setShowAllHistory(true)}>Show all {history.length} runs</button>
+          )}
           {history.length > 0 && (
-            <ConfirmButton label="Clear history" question="Clear all history?" yes="Clear" no="Keep" onYes={() => { setHistory([]); save(LS.history, []); }} />
+            <ConfirmButton label="Clear history" question={sync.status.state === "off" ? "Clear all history?" : "Clear all history on every device?"} yes="Clear" no="Keep" onYes={() => { sync.markCleared(); setHistory([]); save(LS.history, []); historyCache.partial = false; setShowAllHistory(false); }} />
           )}
         </section>
       )}
@@ -308,9 +337,13 @@ export default function Home() {
             <div className="lockeditor">
               <textarea rows={6} value={project.locked} aria-label={`Locked decisions for ${project.name}, one per line`}
                 placeholder={"One per line. Every model and the judge treat these as settled.\ne.g. Single-file HTML, no framework\ne.g. Brand colors navy #1B2A4A / gold #C9A84C"}
-                onChange={(e) => updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: e.target.value } : p)))} />
+                onChange={(e) => updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: e.target.value, updatedAt: Date.now() } : p)))} />
               <ConfirmButton danger label="Delete project" question={`Delete “${project.name}” and its locked decisions?`} yes="Delete" no="Keep"
-                onYes={() => { updateProjects(projects.filter((p) => p.id !== project.id)); chooseProject("none"); setEditingProject(false); }} />
+                onYes={() => {
+                  // Leave a marker instead of removing it, so your other devices delete it too.
+                  updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: "", deleted: true, updatedAt: Date.now() } : p)));
+                  chooseProject("none"); setEditingProject(false);
+                }} />
             </div>
           )}
         </section>
@@ -382,14 +415,20 @@ export default function Home() {
       {(judging || verdict) && (
         <section className="panel verdict" aria-busy={judging}>
           <div className="row">
-            <h2 className="lbl">Verdict {judging ? "" : `· judged by ${label(judgeWith)}`}</h2>
+            <h2 className="lbl">Verdict {judging ? "" : `· judged blind by ${label(judgeWith)}`}</h2>
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <Skeleton /> : (() => {
-            const { best, rest, flags } = verdictParts;
+            const { best, rest, flags, sources } = verdictParts;
             return (
               <>
                 <div className="best md"><Markdown text={best} /></div>
+                {sources && (
+                  <div className="sources">
+                    <h3 className="lbl">Built from</h3>
+                    <div className="md"><Markdown text={sources} /></div>
+                  </div>
+                )}
                 <details className="grading" open={flags > 0}>
                   <summary>{flags > 0 ? `${flags} red flag${flags === 1 ? "" : "s"} · ` : ""}Scorecard &amp; how they compared</summary>
                   <div className="md"><Markdown text={rest} /></div>
@@ -468,18 +507,31 @@ export default function Home() {
   );
 }
 
+// The verdict arrives as one markdown document. Pull out the answer to use, the note on where it
+// came from, and leave the grading (everything else) for the fold-away section.
+function section(v: string, title: string) {
+  const m = new RegExp(`(^|\\n)##\\s*${title}\\s*\\n`, "i").exec(v);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  const next = v.slice(start).search(/\n##\s/);
+  const end = next < 0 ? v.length : start + next;
+  return { from: m.index, to: end, text: v.slice(start, end).trim() };
+}
 function splitVerdict(v: string) {
-  const i = v.search(/##\s*Best combined answer/i);
-  const best = i >= 0 ? v.slice(i).replace(/##\s*Best combined answer\s*/i, "").trim() : v;
-  const rest = i >= 0 ? v.slice(0, i).trim() : "";
+  const b = section(v, "Best combined answer");
+  const s = section(v, "Built from");
+  const best = b ? b.text : v;
+  let rest = b ? v : "";
+  // Cut the later section first so the earlier one's positions stay valid.
+  for (const part of [b, s].filter(Boolean).sort((x, y) => y!.from - x!.from)) rest = rest.slice(0, part!.from) + rest.slice(part!.to);
+  rest = rest.trim();
   const rf = rest.match(/##\s*Red flags\s*([\s\S]*?)(?=\n##|$)/i);
   const flags = rf ? (rf[1].match(/^\s*[-*>]/gm) ?? []).filter((l) => l.trim().startsWith(">")).length || (/none found/i.test(rf[1]) ? 0 : (rf[1].match(/^\s*[-*]/gm) ?? []).length) : 0;
-  return { best, rest, flags };
+  return { best, rest, flags, sources: s?.text ?? "" };
 }
 
 function bestAnswer(v: string) {
-  const i = v.search(/##\s*Best combined answer/i);
-  return i >= 0 ? v.slice(i).replace(/##\s*Best combined answer\s*/i, "").trim() : v;
+  return splitVerdict(v).best;
 }
 
 // Logo chain: your own file in public/logos/<id>.svg or .png → the company's real icon by domain → monogram badge.
@@ -512,6 +564,23 @@ function PresetIcon({ id }: { id: string }) {
   const shape = PRESET_ICONS[id];
   if (!shape) return null;
   return <svg className="chipicon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{shape}</svg>;
+}
+
+// One quiet line saying whether this device is in step with the others.
+function SyncLine({ status, onRetry }: { status: import("./useSync").SyncStatus; onRetry: () => void }) {
+  if (status.state === "failed") {
+    return (
+      <div className="syncline" role="status">
+        <span>Not synced. {status.reason} Your work is saved on this device and will sync when it can.</span>
+        <button className="ghost small" onClick={onRetry}>Sync now</button>
+      </div>
+    );
+  }
+  const text =
+    status.state === "off" ? "Sync is off. Runs and projects are saved on this device only."
+    : status.state === "synced" ? `Synced across your devices at ${new Date(status.at).toLocaleTimeString(undefined, { timeStyle: "short" })}`
+    : "Syncing…";
+  return <div className="syncline" role="status"><span>{text}</span></div>;
 }
 
 // Three grey lines standing in for text that's on its way.
