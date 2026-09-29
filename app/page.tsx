@@ -159,6 +159,7 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  const sendable = selected.filter((s) => byId[s]?.configured && (mode === "text" || byId[s]?.canImage));
   const done = Object.values(results).filter((r) => r !== "loading") as RunResult[];
   const running = Object.values(results).some((r) => r === "loading");
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
@@ -321,8 +322,8 @@ export default function Home() {
         <button className="ghost" disabled={!idea.trim() || briefing} onClick={sharpen}>
           {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen"}
         </button>
-        <button className="primary" disabled={!(brief || idea).trim() || !selected.length || running} onClick={send}>
-          {running ? "Running…" : `Send to ${selected.filter((s) => byId[s]?.configured).map(label).join(" + ") || "…"}`}
+        <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={send}>
+          {running ? "Running…" : sendable.length ? `Send to ${sendable.map(label).join(" + ")}` : mode === "image" ? "Images need an OpenAI or xAI key" : "Pick at least one AI"}
         </button>
       </div>
     </main>
