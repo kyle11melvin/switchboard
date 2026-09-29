@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import dynamic from "next/dynamic";
 import { PRESETS, type Preset } from "@/lib/presets";
 import { predictPreset } from "@/lib/predict";
 import { IMAGE_STYLES } from "@/lib/imageStyles";
@@ -65,10 +64,9 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const DOMAIN: Record<ProviderId, string> = { openai: "openai.com", anthropic: "anthropic.com", xai: "x.ai", perplexity: "perplexity.ai", gemini: "gemini.google.com" };
 const MONO: Record<ProviderId, string> = { openai: "C", anthropic: "A", xai: "X", perplexity: "P", gemini: "G" };
 
-// Wide tables scroll inside their own box instead of squeezing words apart or pushing the page sideways.
-const MD: Components = {
-  table: ({ node, ...props }) => <div className="tablewrap" tabIndex={0} role="region" aria-label="Table"><table {...props} /></div>,
-};
+// The markdown renderer is the heaviest code on the page and isn't needed until an answer lands, so it loads separately.
+const loadMarkdown = () => import("./Markdown");
+const Markdown = dynamic(loadMarkdown, { ssr: false, loading: () => <div className="skeleton" aria-hidden="true"><span /><span /><span /></div> });
 
 const DEFAULT_PROJECTS: Project[] = [{ id: "none", name: "No project", locked: "" }];
 
@@ -113,6 +111,9 @@ export default function Home() {
     const pid = load<unknown>(LS.project, "none");
     setProjectId(typeof pid === "string" ? pid : "none");
     setHistory(loadHistory());
+    // Fetch the renderer once the page has settled, so it's ready before the first answer arrives.
+    const t = setTimeout(() => { loadMarkdown().catch(() => {}); }, 1200);
+    return () => clearTimeout(t);
   }, []);
 
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
@@ -227,6 +228,7 @@ export default function Home() {
   const sendable = selected.filter((s) => byId[s]?.configured);
   const done = Object.values(results).filter((r) => r !== "loading") as RunResult[];
   const running = Object.values(results).some((r) => r === "loading");
+  const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
 
   return (
@@ -354,13 +356,13 @@ export default function Home() {
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <div className="skeleton" aria-hidden="true"><span /><span /><span /></div> : (() => {
-            const { best, rest, flags } = splitVerdict(verdict);
+            const { best, rest, flags } = verdictParts;
             return (
               <>
-                <div className="best md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{best}</ReactMarkdown></div>
+                <div className="best md"><Markdown text={best} /></div>
                 <details className="grading" open={flags > 0}>
                   <summary>{flags > 0 ? `${flags} red flag${flags === 1 ? "" : "s"} · ` : ""}Scorecard &amp; how they compared</summary>
-                  <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{rest}</ReactMarkdown></div>
+                  <div className="md"><Markdown text={rest} /></div>
                 </details>
               </>
             );
@@ -395,13 +397,13 @@ export default function Home() {
                       const inline = src.startsWith("data:");
                       return (
                         <a key={i} href={src} className="imgwrap" {...(inline ? { download: `${pid}-${i + 1}.png` } : { target: "_blank", rel: "noreferrer" })}>
-                          <img src={src} alt={`Image ${i + 1} from ${label(pid as ProviderId)}`} />
+                          <img src={src} decoding="async" alt={`Image ${i + 1} from ${label(pid as ProviderId)}`} />
                           <span>{inline ? "Tap to download" : "Tap to open full size"}</span>
                         </a>
                       );
                     })}
                     {!r.text && !r.images?.length && <p className="muted">Images aren't kept in history. Send it again to redraw.</p>}
-                    {r.text && <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>{r.text}</ReactMarkdown></div>}
+                    {r.text && <div className="md"><Markdown text={r.text} /></div>}
                     {r.citations && r.citations.length > 0 && (
                       <ol className="cites">{r.citations.map((c, i) => <li key={i}><a href={c} target="_blank" rel="noreferrer">{c.replace(/^https?:\/\//, "").slice(0, 60)}</a></li>)}</ol>
                     )}
@@ -450,13 +452,21 @@ function bestAnswer(v: string) {
   return i >= 0 ? v.slice(i).replace(/##\s*Best combined answer\s*/i, "").trim() : v;
 }
 
-// Logo chain: your own file in public/logos/<id>.svg → the company's real icon by domain → monogram badge.
+// Logo chain: your own file in public/logos/<id>.svg or .png → the company's real icon by domain → monogram badge.
+// The layout lists which files exist in public/logos at build time, so the page never asks for one that isn't there.
+function logoSrc(id: ProviderId): string {
+  const files = (document.documentElement.dataset.logos ?? "").split(",");
+  const own = [`${id}.svg`, `${id}.png`].find((f) => files.includes(f));
+  return own ? `/logos/${own}` : `https://www.google.com/s2/favicons?domain=${DOMAIN[id]}&sz=128`;
+}
+
 function Logo({ id }: { id: ProviderId }) {
-  const chain = [`/logos/${id}.svg`, `/logos/${id}.png`, `https://www.google.com/s2/favicons?domain=${DOMAIN[id]}&sz=128`];
-  const [i, setI] = useState(0);
+  const [src, setSrc] = useState<string | null>(null); // null until the page is running in the browser
   const [ok, setOk] = useState(false);
-  if (i >= chain.length) return <i className={`mono ${id}`}>{MONO[id]}</i>;
-  return <img className={`logo ${ok ? "ok" : ""}`} src={chain[i]} alt="" onLoad={() => setOk(true)} onError={() => setI(i + 1)} />;
+  useEffect(() => { setSrc(logoSrc(id)); setOk(false); }, [id]);
+  if (src === "") return <i className={`mono ${id}`}>{MONO[id]}</i>;
+  if (src === null) return <span className="logo" aria-hidden="true" />;
+  return <img className={`logo ${ok ? "ok" : ""}`} src={src} alt="" decoding="async" onLoad={() => setOk(true)} onError={() => setSrc("")} />;
 }
 
 function CopyBtn({ text, label }: { text: string; label: string }) {

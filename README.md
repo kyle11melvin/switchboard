@@ -50,6 +50,7 @@ npm run dev                  # http://localhost:3000
 
 ```
 app/page.tsx          the whole screen
+app/Markdown.tsx      renders answers and verdicts (loaded separately, it's the heaviest code)
 app/api/brief         idea → brief
 app/api/run           one model, one answer (browser calls these in parallel)
 app/api/judge         grade all answers

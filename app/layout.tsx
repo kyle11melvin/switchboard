@@ -1,5 +1,12 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import { Fraunces, Manrope } from "next/font/google";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+
+// Served from this site instead of Google: no extra connections and nothing blocking the first paint.
+const fraunces = Fraunces({ subsets: ["latin"], axes: ["opsz"], display: "swap", variable: "--font-fraunces" });
+const manrope = Manrope({ subsets: ["latin"], display: "swap", variable: "--font-manrope" });
 
 export const metadata: Metadata = {
   title: "Switchboard",
@@ -9,13 +16,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0b0f18", viewportFit: "cover" };
 
+// Which override logos exist, read once at build time (see public/logos/README.md).
+function ownLogos(): string {
+  try { return readdirSync(join(process.cwd(), "public", "logos")).filter((f) => /\.(svg|png)$/i.test(f)).join(","); } catch { return ""; }
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${fraunces.variable} ${manrope.variable}`} data-logos={ownLogos()}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
       <body>{children}</body>
