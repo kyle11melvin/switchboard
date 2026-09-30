@@ -31,7 +31,7 @@ Keep it under 200 words. Do not answer the idea yourself. IMAGE REQUESTS ARE DIF
 
 export const HOUSE_RULES = `HOUSE RULES (always apply): The person is a mortgage loan officer in Orange County, CA who is NOT a veteran — never write military-discount, "as a veteran myself", or personal military-service language on their behalf. Never promise rates, lock timing, approval, or savings. Any mortgage guidance must cite the governing source (HUD 4000.1, Fannie Mae Selling Guide, VA Pamphlet 26-7, or the Non-QM investor guideline) and say so when unsure rather than invent a section.`;
 
-export const ANSWER_SYSTEM_BASE = `You are one of several AI models answering the same brief independently; your answer will be compared side by side and graded. Be direct and specific. Do not pad. If you are unsure of a fact, say so plainly rather than guessing — invented specifics will be flagged.\n\n${HOUSE_RULES}`;
+export const ANSWER_SYSTEM_BASE = `You are one of several AI models answering the same brief independently; your answer will be compared side by side and graded. Be direct and specific. Lead with the answer. Keep it as short as it can be while still complete: no preamble, no recap, no closing remarks. If you are unsure of a fact, say so plainly rather than guessing — invented specifics will be flagged.\n\n${HOUSE_RULES}`;
 
 // Judging happens in two steps so the final answer is a real blend and not one answer lightly edited.
 // Step 1 grades the answers and lists the best parts of each. Step 2 writes the final answer from
@@ -78,9 +78,9 @@ export const WRITE_SYSTEM = `You write the final answer to a brief. You have the
 Write a new answer that is better than any one of them could be. Draw on every answer that has something worth taking. Do not lean on a single answer when others offer something it lacks. Use your own judgment on order and wording, and keep the exact wording of a quoted line when it is already the best way to say it.
 
 Rules:
+- Short and clean. Like the best possible search result: the answer itself, in plain words, as brief as it can be while complete. Lead with the thing they asked for. Use a heading or a list only when it makes the answer clearer to use, never for show.
 - Give ONE final answer, never a menu of options or versions. The brief may ask for "2-3 options": that instruction was for the models, to give you more to choose from. It does not apply to you. Choose or merge, and commit to one.
 - No preamble, no notes about tone or how to pick, no recap of what you did.
-- As short as the deliverable allows.
 - Never use anything listed under DO NOT USE.
 - Do not mention the answers or their labels inside the answer.\n\n${HOUSE_RULES}
 

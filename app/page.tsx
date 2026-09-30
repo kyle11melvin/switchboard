@@ -443,7 +443,7 @@ export default function Home() {
       {(judging || verdict) && (
         <section className="panel verdict" aria-busy={judging}>
           <div className="row">
-            <h2 className="lbl">Verdict {judging ? "" : `· judged blind by ${label(judgeWith)}`}</h2>
+            <h2 className="lbl">{judging ? "Writing the answer…" : `Answer · judged blind by ${label(judgeWith)}`}</h2>
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <Skeleton /> : (() => {
