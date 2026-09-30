@@ -16,7 +16,7 @@ His job in the moment: he has a rough idea (marketing copy, a code question, res
 
 Switchboard takes one rough idea through four steps:
 
-1. **Sharpen** the idea into a tight brief (goal, context, deliverable, constraints, done-criteria). The brief is editable before sending.
+1. **Improve** the question automatically before it goes out (goal, context, deliverable, constraints, done-criteria). People don't know what to ask for; this step is the point. The improved question can be opened, edited and asked again.
 2. **Send** the brief to the AIs he picks.
 3. **Compare** the answers side by side.
 4. **Revise** (optional): after seeing the results, Kyle says in plain words what he'd change; it becomes the next brief, and rounds stay on screen for comparing.

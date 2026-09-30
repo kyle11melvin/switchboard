@@ -4,7 +4,7 @@ One idea → sharpened brief → pick your AIs → side-by-side answers → one 
 
 ## What's in v1
 
-- **Improve it first** — turns a rough question into a tight one (goal, deliverable, constraints, done-criteria). Edit it before asking.
+- **Improving the question** — every question is improved automatically before it's asked (goal, deliverable, constraints, done-criteria). You can open the improved version, edit it, and ask again.
 - **Presets** — routing defaults by task type (`lib/presets.ts`): Creative image → ChatGPT + Grok, Code → Claude + ChatGPT, Research → Perplexity + Claude + Gemini, Loan scenario, Ask everyone. Toggle any model on/off after picking a preset.
 - **Projects** — per-project list of things every AI should always know, sent with every question *and* to the judge. Synced between your devices.
 - **Judge** — works in two steps, blind (answers are shuffled and labelled A/B/C; see `lib/blind.ts`). Step 1 grades every answer and lists the best parts of each. Step 2 writes one final answer from that list alone, without seeing the answers, so it can't copy one. Switchboard then counts how much of the final wording came from each answer (`lib/measure.ts`). You see the answer; the grading is folded away.

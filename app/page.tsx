@@ -109,6 +109,7 @@ export default function Home() {
   const [judgeWith, setJudgeWith] = useState<ProviderId>("anthropic");
 
   const [brief, setBrief] = useState("");
+  const [briefFor, setBriefFor] = useState(""); // the question the improved version was written from
   const [briefing, setBriefing] = useState(false);
   const [rounds, setRounds] = useState<Round[]>([]);   // earlier rounds of this idea, oldest first
   const [revising, setRevising] = useState(false);     // the Revise conversation is open
@@ -197,15 +198,21 @@ export default function Home() {
   }
   function chooseProject(id: string) { setProjectId(id); save(LS.project, id); }
 
-  async function sharpen() {
-    if (briefing || !idea.trim()) return;
+  // Every question is improved before it goes out: people don't know what to ask for, and that's the point.
+  // Returns the improved question, or null when improving failed (the original is then used as-is).
+  async function sharpen(): Promise<string | null> {
+    if (!idea.trim()) return null;
     setErr(""); setBriefing(true);
     try {
       const d = await api<{ brief?: string; error?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain });
       if (d.error) throw new Error(d.error);
-      if (!d.brief) throw new Error("The improved question came back empty. Try again.");
-      setBrief(d.brief); setBriefOpen(true);
-    } catch (e: any) { setErr(`Couldn't improve the question: ${e.message}`); } finally { setBriefing(false); }
+      if (!d.brief) throw new Error("came back empty");
+      setBrief(d.brief); setBriefFor(idea); setBriefOpen(false);
+      return d.brief;
+    } catch (e: any) {
+      setErr(`Couldn't improve the question (${e.message}), so it was sent as written.`);
+      return null;
+    } finally { setBriefing(false); }
   }
 
   async function judge(finalResults: RunResult[], promptUsed: string, id: string) {
@@ -252,10 +259,16 @@ export default function Home() {
   }
 
   async function send(useThis?: string) {
-    const prompt = (useThis ?? (brief || idea)).trim();
     const targets = selected.filter((s) => byId[s]?.configured);
     // Cmd+Enter lands here too, so guard against a second run while one is in flight.
-    if (!prompt || !targets.length || running) return;
+    if (!(useThis ?? idea).trim() || !targets.length || running || briefing) return;
+    // Use the improved question if it's still for this idea; otherwise improve it now.
+    let prompt = (useThis ?? (brief && briefFor === idea ? brief : "")).trim();
+    if (!prompt) {
+      setResults({}); setVerdict("");
+      prompt = ((await sharpen()) ?? idea).trim();
+      if (!prompt) return;
+    }
     // Sending again keeps what came back last time as an earlier round.
     if (done.length) setRounds((all) => [...all, { n: all.length + 1, brief: runPrompt, mode, results: done, verdict }]);
     setRevising(false);
@@ -282,7 +295,7 @@ export default function Home() {
   }
 
   function openHistory(h: HistoryItem) {
-    setIdea(h.idea); setBrief(h.brief === h.idea ? "" : h.brief); setMode(h.mode);
+    setIdea(h.idea); setBrief(h.brief === h.idea ? "" : h.brief); setBriefFor(h.idea); setMode(h.mode);
     // Keep the task chip in step with the kind of run, or its instructions would leak into the wrong kind.
     if (h.mode === "image" && preset.mode !== "image") { const p = PRESETS.find((x) => x.mode === "image"); if (p) { setPreset(p); setSelected(p.models); setAutoJudge(p.judge); } }
     if (h.mode === "text" && preset.mode !== "text") { const p = PRESETS.find((x) => x.id === (predictPreset(h.idea) ?? "copy")) ?? PRESETS.find((x) => x.mode === "text"); if (p) { setPreset(p); setSelected(p.models); setAutoJudge(p.judge); } }
@@ -307,8 +320,8 @@ export default function Home() {
     : done.length && mode === "image" ? "Done. Tap Save image to keep one, or Change something to adjust it."
     : done.length && canJudge ? "Answers are in. Tap Get the top answer."
     : done.length ? "Done. Tap Change something to adjust it, or Start over."
-    : brief ? `Your improved question is ready. Tap ${askLabel}.`
-    : idea.trim() ? `Tap ${askLabel}. Or improve the question first, if you want.`
+    : briefing ? "Improving your question first."
+    : idea.trim() ? `Tap ${askLabel}. It improves your question first, then asks.`
     : "Type what you need in the box above.";
 
   return (
@@ -406,16 +419,10 @@ export default function Home() {
       )}
 
       {/* Idea. Folds away while the AIs work, so the working screen is what you see. */}
-      <section className="panel idea" hidden={running || judging}>
+      <section className="panel idea" hidden={briefing || running || judging}>
         <div className="row"><label className="lbl" htmlFor="idea">Ask anything</label><span className="modepill">{mode === "image" ? "Picture" : "Words"}</span></div>
         <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } }}
           placeholder="Type your question or what you want made. Rough is fine." />
-        {!done.length && (
-          <div className="row improverow">
-            <span className="muted">Optional</span>
-            <button className="ghost small" disabled={!idea.trim() || briefing} onClick={sharpen}>{briefing ? "Improving…" : brief ? "Improve it again" : "Improve my question first"}</button>
-          </div>
-        )}
 
         <div className="chips" role="group" aria-label="What kind of help">
           {PRESETS.map((p) => (
@@ -460,9 +467,9 @@ export default function Home() {
         <section className="panel briefpanel">
           <div className="row briefhead">
             <button className="brieftoggle" aria-expanded={briefOpen} aria-controls="brief" onClick={() => setBriefOpen((v) => !v)}>
-              <span className="lbl">{briefOpen ? (brief !== runPrompt && done.length ? `Your improved question for try ${rounds.length + 2} · this is what gets sent` : "Your improved question · this is what gets sent") : "Your improved question · tap to open"}</span>
+              <span className="lbl">{briefOpen ? "The question that was asked · edit it and ask again" : "See the question that was asked"}</span>
             </button>
-            <button className="ghost small" onClick={() => setBrief("")}>Use my original instead</button>
+            <button className="ghost small" onClick={() => { setBrief(""); setBriefFor(""); }}>Use my original instead</button>
           </div>
           {briefOpen && <textarea id="brief" rows={10} aria-label="Your improved question" value={brief} onChange={(e) => setBrief(e.target.value)} />}
         </section>
@@ -474,7 +481,7 @@ export default function Home() {
           onClose={() => setRevising(false)}
           onBrief={(b) => {
             // One step: the change becomes the new question and goes straight out.
-            setBrief(b); setBriefOpen(false); setRevising(false);
+            setBrief(b); setBriefFor(idea); setBriefOpen(false); setRevising(false);
             void send(b);
           }} />
       )}
@@ -484,12 +491,12 @@ export default function Home() {
 
       <div ref={resultsRef} className="anchor" />
 
-      {(running || judging) && (
+      {(briefing || running || judging) && (
         <section className="panel working" aria-live="polite">
           <Mark size={96} />
-          <h2>{running ? `Asking ${Object.keys(results).length} AI${Object.keys(results).length === 1 ? "" : "s"}…` : "Working out the top answer…"}</h2>
-          <p className="muted">{running ? "Each one answers on its own. Then one of them picks the best of all of them." : `${label(judgeWith)} is reading every answer and writing the top one.`}</p>
-          <ul className="progress">
+          <h2>{briefing ? "Improving your question…" : running ? `Asking ${Object.keys(results).length} AI${Object.keys(results).length === 1 ? "" : "s"}…` : "Working out the top answer…"}</h2>
+          <p className="muted">{briefing ? "Turning what you typed into a question the AIs will answer well." : running ? "Each one answers on its own. Then one of them picks the best of all of them." : `${label(judgeWith)} is reading every answer and writing the top one.`}</p>
+          {!briefing && <ul className="progress">
             {Object.entries(results).map(([pid, r]) => (
               <li key={pid} className={r === "loading" ? "wait" : r.error ? "bad" : "done"}>
                 <Logo id={pid as ProviderId} /><span>{label(pid as ProviderId)}</span>
@@ -497,7 +504,7 @@ export default function Home() {
                 <i><b /></i>
               </li>
             ))}
-          </ul>
+          </ul>}
           <p className="muted small">This usually takes about a minute.</p>
         </section>
       )}
@@ -626,8 +633,8 @@ export default function Home() {
         {done.length > 0 && !running && (
           <button className="ghost" aria-expanded={revising} onClick={() => { setRevising(true); setTimeout(() => document.querySelector(".revise")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Change something</button>
         )}
-        <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={() => send()}>
-          {running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? `${askLabel} →` : "Pick at least one AI"}
+        <button className="primary" disabled={!idea.trim() || !sendable.length || running || briefing} onClick={() => send()}>
+          {briefing ? "Improving…" : running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? `${askLabel} →` : "Pick at least one AI"}
         </button>
         </div>
       </div>}
