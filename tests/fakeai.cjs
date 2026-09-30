@@ -12,6 +12,14 @@ const json = (o) => new Response(JSON.stringify(o), { status: 200, headers: { "c
 
 // What each kind of text call gets back, told apart by the system prompt.
 function reply(system, user) {
+  if (/decide where a request goes/.test(system)) {
+    // The pick step: a picture when there's a photo or a scene, research for questions, otherwise copy.
+    const req = (/REQUEST:\n([\s\S]*?)(?:\n\n|$)/.exec(user) || [])[1] || "";
+    const photo = /\d photos? (is|are) attached/.test(req);
+    const job = photo || /\b(draw|picture|image|playing football)\b/i.test(req) ? "image" : /\b(best|what|how|which)\b/i.test(req) ? "research" : "copy";
+    const ais = job === "image" ? ["openai", "xai"] : ["openai", "anthropic", "xai"];
+    return JSON.stringify({ job, ais, why: job === "image" ? "It asks for a picture." : "It's words for people to read." });
+  }
   if (/rough idea into a tight brief/.test(system)) return "GOAL: " + user.split("\n").slice(-1)[0].slice(0, 80) + "\nDELIVERABLE: one short answer.";
   if (/You are the gatekeeper/.test(system)) return "## Verdict\nAnswer B is best.\n\n## Scorecard\nA 7/10, B 9/10\n\n## Red flags\nNone.\n\n## Best parts\n- Answer A: the opening line.\n- Answer B: the numbers.";
   if (/write the final answer to a brief/.test(system)) return "## Best combined answer\nThe top answer, built from the best parts.\n\n## Built from\nAnswer B 60%, Answer A 40%";
