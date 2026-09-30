@@ -182,6 +182,14 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .progress li.bad b { background: var(--red); width: 100%; }
 @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
 
+/* Attached photos */
+.photorow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.photorow .muted { margin: 0; font-size: 0.75rem; }
+.photo { position: relative; width: 56px; height: 56px; flex: none; }
+.photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; border: 1px solid var(--line2); display: block; }
+.photo button { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; background: var(--panel); border: 1px solid var(--field-line); color: var(--text); font-size: 1rem; line-height: 1; display: grid; place-items: center; }
+.addphoto { display: inline-flex; align-items: center; gap: 6px; }
+
 /* Chips: task types, image styles, AIs */
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .chips.styles { margin-top: 10px; gap: 6px; }

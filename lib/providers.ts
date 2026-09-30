@@ -205,20 +205,38 @@ async function embed(src: string): Promise<string> {
   }
 }
 
-export async function runImage(id: ProviderId, prompt: string, styleNote?: string): Promise<RunResult> {
+// Photos the person attached, as data URLs. Image models use them as reference (the people, pets or
+// things in the picture); models that can't draw look at them while writing the prompt.
+export async function runImage(id: ProviderId, prompt: string, styleNote?: string, photos: Shown[] = []): Promise<RunResult> {
   const t0 = Date.now();
   const def = PROVIDERS[id];
   if (!def.imageModel) {
-    const r = await runText(id, [IMAGE_PROMPT_SYSTEM, styleNote].filter(Boolean).join("\n\n"), prompt);
+    const r = await runText(id, [IMAGE_PROMPT_SYSTEM, styleNote].filter(Boolean).join("\n\n"), prompt, photos);
     return { ...r, promptOnly: true };
   }
   const model = def.imageModel();
   try {
-    const url =
-      id === "openai" ? "https://api.openai.com/v1/images/generations" : "https://api.x.ai/v1/images/generations";
-    const body: Record<string, unknown> = { model, prompt, n: 1 };
-    if (id === "openai") body.size = process.env.OPENAI_IMAGE_SIZE || "1024x1024";
-    const data = await postJSON(url, { authorization: `Bearer ${key(id)}` }, body);
+    const refs = photos.filter((p) => parts(p)).slice(0, 5);
+    let data: any;
+    if (refs.length && id === "openai") {
+      // Edits take the pictures as files, so this one call is a form rather than JSON.
+      const form = new FormData();
+      form.append("model", model); form.append("prompt", prompt); form.append("n", "1");
+      form.append("size", process.env.OPENAI_IMAGE_SIZE || "1024x1024");
+      refs.forEach((p, i) => { const q = parts(p)!; form.append("image[]", new Blob([Buffer.from(q.data, "base64")], { type: q.type }), `photo-${i + 1}.${q.type.split("/")[1]}`); });
+      let res: Response;
+      try { res = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { authorization: `Bearer ${key(id)}` }, body: form, signal: AbortSignal.timeout(TIMEOUT_MS) }); }
+      catch (e: any) { throw new Error(e?.name === "TimeoutError" ? `No reply after ${TIMEOUT_MS / 1000} seconds. Try again.` : "Couldn't reach this provider. Try again in a moment."); }
+      data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error?.message || `${res.status}`);
+    } else if (refs.length && id === "xai") {
+      data = await postJSON("https://api.x.ai/v1/images/edits", { authorization: `Bearer ${key(id)}` }, { model, prompt, images: refs.map((p) => ({ type: "image_url", url: p.dataUrl })) });
+    } else {
+      const url = id === "openai" ? "https://api.openai.com/v1/images/generations" : "https://api.x.ai/v1/images/generations";
+      const body: Record<string, unknown> = { model, prompt, n: 1 };
+      if (id === "openai") body.size = process.env.OPENAI_IMAGE_SIZE || "1024x1024";
+      data = await postJSON(url, { authorization: `Bearer ${key(id)}` }, body);
+    }
     const images: string[] = await Promise.all(
       (data?.data ?? [])
         .map((d: any) => (d.b64_json ? `data:image/png;base64,${d.b64_json}` : d.url))

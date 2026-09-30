@@ -110,7 +110,10 @@ export default function Home() {
 
   const [brief, setBrief] = useState("");
   const [briefFor, setBriefFor] = useState("");
-  const [notice, setNotice] = useState(""); // a quiet note about this run, kept until the next one // the question the improved version was written from
+  const [notice, setNotice] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]); // attached photos, shrunk, as data URLs
+  const [photoNote, setPhotoNote] = useState("");
+  const photoInput = useRef<HTMLInputElement>(null); // a quiet note about this run, kept until the next one // the question the improved version was written from
   const [briefing, setBriefing] = useState(false);
   const [rounds, setRounds] = useState<Round[]>([]);   // earlier rounds of this idea, oldest first
   const [revising, setRevising] = useState(false);     // the Revise conversation is open
@@ -205,7 +208,7 @@ export default function Home() {
     if (!idea.trim()) return null;
     setErr(""); setBriefing(true);
     try {
-      const d = await api<{ brief?: string; error?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain });
+      const d = await api<{ brief?: string; error?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain, photos });
       if (d.error) throw new Error(d.error);
       if (!d.brief) throw new Error("came back empty");
       setBrief(d.brief); setBriefFor(idea); setBriefOpen(false);
@@ -236,7 +239,7 @@ export default function Home() {
   async function runOne(provider: ProviderId, prompt: string, id: string): Promise<RunResult> {
     let res: RunResult;
     try {
-      const d = await api<Partial<RunResult>>("/api/run", { provider, mode, prompt, project: projectCtx, presetNote: noteFor });
+      const d = await api<Partial<RunResult>>("/api/run", { provider, mode, prompt, project: projectCtx, presetNote: noteFor, photos });
       res = { model: "", ms: 0, ...d, provider };
       if (!res.error && !res.text && !res.images?.length) res.error = "Came back empty. Try again.";
     } catch (e: any) {
@@ -323,7 +326,7 @@ export default function Home() {
     : done.length && canJudge ? "Answers are in. Tap Get the top answer."
     : done.length ? "Done. Tap Change something to adjust it, or Start over."
     : briefing ? "Improving your question first."
-    : idea.trim() ? `Tap ${askLabel}. It improves your question first, then asks.`
+    : idea.trim() ? `Tap ${askLabel}. It improves your question first, then asks.${photos.length ? " Your photos go along." : ""}`
     : "Type what you need in the box above.";
 
   return (
@@ -355,7 +358,7 @@ export default function Home() {
             )}
           </div>
           {Object.keys(results).length > 0 && (
-            <button className="iconbtn" aria-label="Start over" title="Start over" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setRounds([]); setRevising(false); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
+            <button className="iconbtn" aria-label="Start over" title="Start over" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setPhotos([]); setRounds([]); setRevising(false); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           )}
@@ -425,6 +428,29 @@ export default function Home() {
         <div className="row"><label className="lbl" htmlFor="idea">Ask anything</label><span className="modepill">{mode === "image" ? "Picture" : "Words"}</span></div>
         <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } }}
           placeholder="Type your question or what you want made. Rough is fine." />
+        <div className="photorow">
+          {photos.map((src, i) => (
+            <span key={i} className="photo">
+              <img src={src} alt={`Attached photo ${i + 1}`} />
+              <button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => setPhotos((all) => all.filter((_, j) => j !== i))}>×</button>
+            </span>
+          ))}
+          {photos.length < 5 && (
+            <button type="button" className="ghost small addphoto" onClick={() => photoInput.current?.click()}>
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="1.6" /><path d="M21 16l-5-5-8 9" /></svg>
+              {photos.length ? "Add another" : "Add photos"}
+            </button>
+          )}
+          <input ref={photoInput} type="file" accept="image/*" multiple hidden onChange={async (e) => {
+            const files = Array.from(e.target.files ?? []).slice(0, 5 - photos.length);
+            e.target.value = "";
+            setPhotoNote("");
+            const added = (await Promise.all(files.map(shrinkFile))).filter((x): x is string => !!x);
+            if (added.length < files.length) setPhotoNote("One of those files couldn't be read as a photo.");
+            if (added.length) setPhotos((all) => [...all, ...added].slice(0, 5));
+          }} />
+          {photoNote && <span className="muted">{photoNote}</span>}
+        </div>
 
         <div className="chips" role="group" aria-label="What kind of help">
           {PRESETS.map((p) => (
@@ -770,6 +796,21 @@ function ResultImage({ src, name, alt }: { src: string; name: string; alt: strin
       </figcaption>
     </figure>
   );
+}
+
+// A chosen photo, shrunk so a few of them still make a small request.
+async function shrinkFile(file: File, max = 1024): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(bitmap.width * scale));
+    c.height = Math.max(1, Math.round(bitmap.height * scale));
+    c.getContext("2d")!.drawImage(bitmap, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.85);
+  } catch {
+    return null;
+  }
 }
 
 // The Switchboard mark: three sources feeding one point.
