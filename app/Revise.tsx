@@ -86,7 +86,7 @@ export default function Revise(props: {
             <span className="sr">{m.role === "you" ? "Switchboard asks: " : "You said: "}</span>{m.text}
           </p>
         ))}
-        {busy && <p className="asks thinking">{answered && chat[chat.length - 1].role === "them" ? "Reading the answers and rewriting your question…" : "Thinking…"}</p>}
+        {busy && <p className="asks thinking">{answered && chat[chat.length - 1].role === "them" ? "Reading the answers and rewriting your question. Then it asks again." : "Thinking…"}</p>}
         <div ref={end} />
       </div>
       {err && <div className="error" role="alert">{err}</div>}
@@ -97,7 +97,7 @@ export default function Revise(props: {
         onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); void say(); } }} />
       <div className="row reviseactions">
         <span className="muted">Tap the microphone on your keyboard to speak instead of type.</span>
-        <button className="primary small" disabled={!draft.trim() || busy} onClick={say}>{busy ? "Working…" : answered ? "Send" : "Apply my changes"}</button>
+        <button className="primary small" disabled={!draft.trim() || busy} onClick={say}>{busy ? "Working…" : answered ? "Send" : "Make the change and ask again"}</button>
       </div>
     </section>
   );

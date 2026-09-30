@@ -243,8 +243,8 @@ export default function Home() {
     sync.syncSoon();
   }
 
-  async function send() {
-    const prompt = (brief || idea).trim();
+  async function send(useThis?: string) {
+    const prompt = (useThis ?? (brief || idea)).trim();
     const targets = selected.filter((s) => byId[s]?.configured);
     // Cmd+Enter lands here too, so guard against a second run while one is in flight.
     if (!prompt || !targets.length || running) return;
@@ -290,6 +290,18 @@ export default function Home() {
   const failedCount = done.filter((r) => r.error).length;
   const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
+  // One line that always says what to do next. Assumes nothing.
+  const askLabel = sendable.length > 2 ? `Ask ${sendable.length} AIs` : sendable.length ? `Ask ${sendable.map(label).join(" + ")}` : "";
+  const nextStep = !sendable.length ? "Pick at least one AI above."
+    : running ? (mode === "image" ? "Drawing. Pictures take about half a minute." : "Asking. Answers take up to a minute.")
+    : judging ? "Combining the answers into one. About a minute."
+    : verdict ? "Done. Copy the answer, or tap Change something to adjust it."
+    : done.length && mode === "image" ? "Done. Tap Save image to keep one, or Change something to adjust it."
+    : done.length && canJudge ? "Answers are in. Tap Combine these answers to get one best answer."
+    : done.length ? "Done. Tap Change something to adjust it, or Start over."
+    : brief ? `Your improved question is ready. Tap ${askLabel}.`
+    : idea.trim() ? `Tap ${askLabel}. Or improve the question first, if you want.`
+    : "Type what you need in the box above.";
 
   return (
     <main>
@@ -428,9 +440,9 @@ export default function Home() {
           results={done.map((r) => ({ name: label(r.provider), text: r.text, error: r.error, images: r.images }))}
           onClose={() => setRevising(false)}
           onBrief={(b) => {
-            setBrief(b); setBriefOpen(true); setRevising(false);
-            setAnnounce("Your improved question is ready. Edit it if you like, then ask again.");
-            setTimeout(() => document.querySelector(".briefpanel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60);
+            // One step: the change becomes the new question and goes straight out.
+            setBrief(b); setBriefOpen(false); setRevising(false);
+            void send(b);
           }} />
       )}
 
@@ -557,7 +569,9 @@ export default function Home() {
         </section>
       )}
 
-      <div className="actionbar">
+      {!revising && <div className="actionbar">
+        <p className="nextstep" role="status">{nextStep}</p>
+        <div className="actionrow">
         {done.length > 0 && !running ? (
           <button className="ghost" aria-expanded={revising} onClick={() => { setRevising(true); setTimeout(() => document.querySelector(".revise")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Change something</button>
         ) : (
@@ -565,10 +579,11 @@ export default function Home() {
             {briefing ? "Improving…" : brief ? "Improve again" : "Improve it first"}
           </button>
         )}
-        <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={send}>
+        <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={() => send()}>
           {running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? (sendable.length > 2 ? `Ask ${sendable.length} AIs` : `Ask ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
         </button>
-      </div>
+        </div>
+      </div>}
     </main>
   );
 }
