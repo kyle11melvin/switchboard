@@ -129,6 +129,7 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [runPrompt, setRunPrompt] = useState("");
+  const [askedIdea, setAskedIdea] = useState("");
   const [announce, setAnnounce] = useState(""); // read out by screen readers when answers and verdicts land
   const resultsRef = useRef<HTMLDivElement>(null);
   const activeRun = useRef<string | null>(null); // results from any other run are stale and ignored
@@ -262,6 +263,13 @@ export default function Home() {
     sync.syncSoon();
   }
 
+  // Clear the screen for a fresh question. Projects and history stay.
+  function startOver() {
+    activeRun.current = null; setRunId(null); setRunPrompt(""); setAskedIdea(""); setErr(""); setNotice(""); setPhotos([]); setRounds([]); setRevising(false);
+    setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false);
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
+    setTimeout(() => document.getElementById("idea")?.focus({ preventScroll: true }), 50);
+  }
   async function send(useThis?: string) {
     const targets = selected.filter((s) => byId[s]?.configured);
     // Cmd+Enter lands here too, so guard against a second run while one is in flight.
@@ -278,7 +286,7 @@ export default function Home() {
     if (done.length) setRounds((all) => [...all, { n: all.length + 1, brief: runPrompt, mode, results: done, verdict }]);
     setRevising(false);
     setVerdict(""); setBriefOpen(false); setShowAnswers(false);
-    const id = uid(); setRunId(id); setRunPrompt(prompt); activeRun.current = id;
+    const id = uid(); setRunId(id); setRunPrompt(prompt); setAskedIdea(idea); activeRun.current = id;
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
     setTimeout(() => window.scrollTo({ top: 0, behavior: scrollBehavior() }), 50);
@@ -306,7 +314,7 @@ export default function Home() {
     if (h.mode === "text" && preset.mode !== "text") { const p = PRESETS.find((x) => x.id === (predictPreset(h.idea) ?? "copy")) ?? PRESETS.find((x) => x.mode === "text"); if (p) { setPreset(p); setSelected(p.models); setAutoJudge(p.judge); } }
     setPresetLocked(true);
     setResults(Object.fromEntries(h.results.map((r) => [r.provider, r])));
-    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false); setShowAnswers(false); setRounds([]); setRevising(false);
+    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); setAskedIdea(h.idea); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false); setShowAnswers(false); setRounds([]); setRevising(false);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
   }
 
@@ -316,16 +324,19 @@ export default function Home() {
   const failedCount = done.filter((r) => r.error).length;
   const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
+  // Results are in and the question hasn't been edited since: the next move is New ask, not asking the same thing again.
+  const finished = done.length > 0 && !running && !judging && !briefing && idea.trim() === askedIdea.trim();
   // One line that always says what to do next. Assumes nothing.
   const askLabel = sendable.length > 2 ? `Ask ${sendable.length} AIs` : sendable.length ? `Ask ${sendable.map(label).join(" + ")}` : "";
   const nextStep = !sendable.length ? "Pick at least one AI above."
     : running ? (mode === "image" ? "Drawing. Pictures take about half a minute." : "Asking. Answers take up to a minute.")
     : judging ? "Working out the top answer. About a minute."
     : done.length && failedCount === done.length ? (done.length > 1 ? "None of them answered. Tap Try again on each, or ask again." : "It didn't answer. Tap Try again.")
-    : verdict ? "Done. Copy the answer, or tap Change something to adjust it."
-    : done.length && mode === "image" ? "Done. Tap Save image to keep one, or Change something to adjust it."
+    : done.length && !finished ? `Tap ${askLabel} to ask the new question.`
+    : verdict ? "Done. Copy the answer. Change something to adjust it, or New ask to move on."
+    : done.length && mode === "image" ? "Done. Save the one you like. Change something to adjust it, or New ask to move on."
     : done.length && canJudge ? "Answers are in. Tap Get the top answer."
-    : done.length ? "Done. Tap Change something to adjust it, or Start over."
+    : done.length ? "Done. Change something to adjust it, or New ask to move on."
     : briefing ? "Improving your question first."
     : idea.trim() ? `Tap ${askLabel}. It improves your question first, then asks.${photos.length ? " Your photos go along." : ""}`
     : "Type what you need in the box above.";
@@ -358,11 +369,6 @@ export default function Home() {
               </div>
             )}
           </div>
-          {Object.keys(results).length > 0 && (
-            <button className="iconbtn" aria-label="Start over" title="Start over" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setPhotos([]); setRounds([]); setRevising(false); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
-              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          )}
           <button className="iconbtn" aria-label={history.length ? `History, ${history.length} run${history.length === 1 ? "" : "s"}` : "History"} aria-expanded={showHistory} onClick={() => setShowHistory((v) => !v)}>
             <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
             {history.length > 0 && <span className="badge" aria-hidden="true">{history.length}</span>}
@@ -663,9 +669,15 @@ export default function Home() {
         {done.length > 0 && !running && (
           <button className="ghost" aria-expanded={revising} onClick={() => { setRevising(true); setTimeout(() => document.querySelector(".revise")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Change something</button>
         )}
-        <button className="primary" disabled={!idea.trim() || !sendable.length || running || briefing} onClick={() => send()}>
-          {briefing ? "Improving…" : running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? `${askLabel} →` : "Pick at least one AI"}
-        </button>
+        {finished ? (
+          <button className="primary" onClick={startOver}>
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>New ask
+          </button>
+        ) : (
+          <button className="primary" disabled={!idea.trim() || !sendable.length || running || briefing} onClick={() => send()}>
+            {briefing ? "Improving…" : running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? `${askLabel} →` : "Pick at least one AI"}
+          </button>
+        )}
         </div>
       </div>}
     </main>
