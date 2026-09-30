@@ -192,6 +192,21 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Chips: task types, image styles, AIs */
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+/* The AI row folded to one line: who will answer, and "change" to open the chips. */
+.modelsline { margin-top: 14px; width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border-radius: var(--r-sm); border: 1px solid var(--field-line); background: rgba(var(--white-rgb), 0.03); color: var(--text); text-align: left; font-weight: 600; }
+.modelsline .modelslogos { display: flex; flex: none; }
+.modelsline .modelslogos .logo, .modelsline .modelslogos .mono { margin-left: -6px; border: 2px solid var(--panel); border-radius: 50%; }
+.modelsline .modelslogos .logo:first-child, .modelsline .modelslogos .mono:first-child { margin-left: 0; }
+.modelsline > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.modelsline .muted { margin: 0; font-size: 0.8125rem; font-weight: 700; color: var(--accent2); }
+/* After a run: what you asked, in one line, so the answer comes first. */
+.asked { padding: 12px 16px; }
+.askedrow { align-items: center; flex-wrap: nowrap; gap: 12px; }
+.askedtext { flex: 1; min-width: 0; }
+.askedtext p { margin: 2px 0 0; font-size: 0.9375rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.photorow.small { margin-top: 8px; }
+.photorow.small .photo { width: 36px; height: 36px; }
+.photorow.small .photo img { border-radius: 8px; }
 .chips.styles { margin-top: 10px; gap: 6px; }
 .chip { background: var(--panel2); border: 1px solid var(--line2); padding: 9px 14px; border-radius: var(--pill); font-size: 0.875rem; font-weight: 600; color: var(--text); }
 .chip.on { border-color: var(--accent2); background: linear-gradient(180deg, var(--accent2), var(--accent)); color: var(--accent-ink); font-weight: 700; box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.3); }

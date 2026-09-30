@@ -66,6 +66,8 @@ const hint = (p) => p.locator(".nextstep").textContent().then((t) => t.trim());
       ok("top answer shown", /top answer/i.test(await p.locator(".verdict .best").textContent()));
       ok("how it got there is folded", !(await p.locator(".grading").first().evaluate((d) => d.open)));
       ok("after results the bar offers Change something and New ask", (await bar(p)) === "Change something | New ask", await bar(p));
+      ok("the form folds to one line so the answer comes first", (await p.locator(".asked").count()) === 1 && /rate buydowns/.test(await p.locator(".asked").textContent()) && (await p.locator("#idea").isHidden()));
+      ok("the top answer is on the first screen (phone)", await p.evaluate(() => { const r = document.querySelector(".verdict").getBoundingClientRect(); return r.top < window.innerHeight * 0.6; }));
       // Change something
       await p.getByRole("button", { name: "Change something" }).click();
       await p.waitForSelector("#revise-say");
@@ -77,6 +79,8 @@ const hint = (p) => p.locator(".nextstep").textContent().then((t) => t.trim());
       ok("a change re-asks with a revised brief", calls().some((x) => /revise a brief/.test(x.system)));
       ok("earlier round is kept", (await p.locator("details.round").count()) === 1);
       // Edit the idea → Ask comes back; New ask clears
+      await p.getByRole("button", { name: "Edit" }).click();
+      ok("Edit reopens the form", await p.locator("#idea").isVisible());
       await p.fill("#idea", "Write an instagram post about rate buydowns for first-time buyers");
       ok("editing the question brings Ask back", /^Ask /.test(await p.locator(".actionrow .primary").textContent()));
       await p.fill("#idea", "Write an instagram post about rate buydowns");
@@ -84,6 +88,10 @@ const hint = (p) => p.locator(".nextstep").textContent().then((t) => t.trim());
       await sleep(300);
       ok("New ask clears everything and focuses the box", (await p.inputValue("#idea")) === "" && (await p.locator(".verdict").count()) === 0 && (await p.evaluate(() => document.activeElement?.id)) === "idea");
       ok("history has the runs", (await p.locator(".badge").first().textContent()) === "2");
+      ok("the AI row is folded to one line", (await p.locator(".modelsline").count()) === 1 && /Asking ChatGPT \+ Claude \+ Grok/.test(await p.locator(".modelsline").textContent()));
+      await p.locator(".modelsline").click();
+      ok("tapping it opens the chips", (await p.locator(".chips.models .chip").count()) === 5);
+
       ok("no page errors (words)", errors.length === 0, errors.join("; "));
       await p.context().close();
     }
@@ -108,6 +116,14 @@ const hint = (p) => p.locator(".nextstep").textContent().then((t) => t.trim());
       await p.getByRole("button", { name: "New ask" }).click();
       await sleep(200);
       ok("New ask clears the photo", (await p.locator(".photo").count()) === 0);
+      ok("New ask goes back to words, so the next question isn't drawn", /Words/i.test(await p.locator(".modepill").textContent()));
+      await p.fill("#idea", "How should I explain PMI to a first-time buyer?");
+      ok("a plain question stays words", /Words/i.test(await p.locator(".modepill").textContent()));
+      // Reopen the picture run from history: no pictures kept, so the button offers Redraw
+      await p.getByRole("button", { name: /History/ }).click();
+      await p.locator("[aria-label=History] button.hist").first().click();
+      await sleep(300);
+      ok("a picture run from history offers Redraw", /Redraw/.test(await bar(p)), await bar(p));
       ok("no page errors (pictures)", errors.length === 0, errors.join("; "));
       await p.context().close();
     }

@@ -133,6 +133,10 @@ export default function Home() {
   const [runId, setRunId] = useState<string | null>(null);
   const [runPrompt, setRunPrompt] = useState("");
   const [askedIdea, setAskedIdea] = useState("");
+  const [askOpen, setAskOpen] = useState(false); // after a run the idea panel folds to one line; Edit reopens it
+  const [useOriginal, setUseOriginal] = useState(false); // "Use my original instead": next ask sends the raw idea
+  const [fromHistory, setFromHistory] = useState(false); // a picture run opened from history has no pictures; offer Redraw
+  const [modelsOpen, setModelsOpen] = useState(false); // the AI row is one line until tapped
   const [announce, setAnnounce] = useState(""); // read out by screen readers when answers and verdicts land
   const resultsRef = useRef<HTMLDivElement>(null);
   const activeRun = useRef<string | null>(null); // results from any other run are stale and ignored
@@ -291,7 +295,10 @@ export default function Home() {
   // Clear the screen for a fresh question. Projects and history stay.
   function startOver() {
     activeRun.current = null; setRunId(null); setRunPrompt(""); setAskedIdea(""); setErr(""); setNotice(""); setPhotos([]); setRounds([]); setRevising(false);
-    setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); setModelsLocked(false); setRouted(null);
+    setResults({}); setVerdict(""); setBrief(""); setBriefFor(""); setIdea(""); setPresetLocked(false); setModelsLocked(false); setRouted(null);
+    setAskOpen(false); setUseOriginal(false); setFromHistory(false); setModelsOpen(false);
+    // A fresh question starts as words. Otherwise a picture run would quietly make the next question a picture too.
+    if (mode !== "text") applyPreset(PRESETS[1]);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
     setTimeout(() => document.getElementById("idea")?.focus({ preventScroll: true }), 50);
   }
@@ -320,6 +327,7 @@ export default function Home() {
     setRevising(false);
     setVerdict(""); setBriefOpen(false); setShowAnswers(false);
     const id = uid(); setRunId(id); setRunPrompt(prompt); setAskedIdea(idea); activeRun.current = id;
+    setAskOpen(false); setUseOriginal(false); setFromHistory(false);
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
     setTimeout(() => window.scrollTo({ top: 0, behavior: scrollBehavior() }), 50);
@@ -348,6 +356,7 @@ export default function Home() {
     setPresetLocked(true); setModelsLocked(true); setSelected(h.results.map((r) => r.provider));
     setResults(Object.fromEntries(h.results.map((r) => [r.provider, r])));
     setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); setAskedIdea(h.idea); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false); setShowAnswers(false); setRounds([]); setRevising(false);
+    setAskOpen(false); setUseOriginal(false); setFromHistory(true); setPhotos([]);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
   }
 
@@ -358,7 +367,12 @@ export default function Home() {
   const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
   // Results are in and the question hasn't been edited since: the next move is New ask, not asking the same thing again.
-  const finished = done.length > 0 && !running && !judging && !briefing && idea.trim() === askedIdea.trim();
+  const settled = done.length > 0 && !running && !judging && !briefing;
+  // An edited improved question, "use my original", or a history picture run each have their own ask-again.
+  const briefEdited = settled && !!brief.trim() && !!runPrompt && brief.trim() !== runPrompt.trim();
+  const redraw = settled && fromHistory && mode === "image" && !done.some((r) => r.images?.length);
+  const askAgain = !settled ? null : useOriginal ? { label: "Ask with my original →", go: () => send(idea) } : briefEdited ? { label: "Ask again with this →", go: () => send(brief) } : redraw ? { label: "Redraw →", go: () => send(runPrompt) } : null;
+  const finished = settled && idea.trim() === askedIdea.trim() && !askAgain;
   // One line that always says what to do next. Assumes nothing.
   const anyAI = providers.some((p) => p.configured);
   const askLabel = !showChoice ? "Ask" : sendable.length > 2 ? `Ask ${sendable.length} AIs` : sendable.length ? `Ask ${sendable.map(label).join(" + ")}` : "";
@@ -368,6 +382,7 @@ export default function Home() {
     : running ? (mode === "image" ? "Drawing. Pictures take about half a minute." : "Asking. Answers take up to a minute.")
     : judging ? "Working out the top answer. About a minute."
     : done.length && failedCount === done.length ? (done.length > 1 ? "None of them answered. Tap Try again on each, or ask again." : "It didn't answer. Tap Try again.")
+    : askAgain ? (useOriginal ? "Tap Ask with my original to send your words as typed." : briefEdited ? "Tap Ask again with this to send the edited question." : "Pictures aren't kept. Tap Redraw to make them again.")
     : done.length && !finished ? `Tap ${askLabel} to ask the new question.`
     : verdict ? "Done. Copy the answer. Change something to adjust it, or New ask to move on."
     : done.length && mode === "image" ? "Done. Save the one you like. Change something to adjust it, or New ask to move on."
@@ -377,6 +392,18 @@ export default function Home() {
     : idea.trim() && !showChoice ? `Tap Ask. It picks the AIs, improves your question, then asks.${photos.length ? " Your photos go along." : ""}`
     : idea.trim() ? `Tap ${askLabel}. It improves your question first, then asks.${photos.length ? " Your photos go along." : ""}`
     : "Type what you need in the box above.";
+
+  const briefPanel = brief && !briefing && !running && !judging && !useOriginal ? (
+        <section className="panel briefpanel">
+          <div className="row briefhead">
+            <button className="brieftoggle" aria-expanded={briefOpen} aria-controls="brief" onClick={() => setBriefOpen((v) => !v)}>
+              <span className="lbl">{briefOpen ? "The improved question · edit it and ask again" : "See the improved question"}</span>
+            </button>
+            <button className="ghost small" onClick={() => { if (settled) setUseOriginal(true); else { setBrief(""); setBriefFor(""); } }}>Use my original instead</button>
+          </div>
+          {briefOpen && <textarea id="brief" rows={10} aria-label="Your improved question" value={brief} onChange={(e) => setBrief(e.target.value)} />}
+        </section>
+  ) : null;
 
   return (
     <main>
@@ -467,8 +494,19 @@ export default function Home() {
         </section>
       )}
 
+      {/* After a run the idea folds to one line so the answer comes first. Edit reopens it. */}
+      {settled && !askOpen && (
+        <section className="panel asked">
+          <div className="row askedrow">
+            <div className="askedtext"><span className="lbl">You asked</span><p>{askedIdea || runPrompt}</p></div>
+            <button className="ghost small" onClick={() => { setAskOpen(true); setTimeout(() => document.getElementById("idea")?.focus({ preventScroll: true }), 50); }}>Edit</button>
+          </div>
+          {photos.length > 0 && <div className="photorow small">{photos.map((src, i) => <span key={i} className="photo"><img src={src} alt={`Attached photo ${i + 1}`} /></span>)}</div>}
+        </section>
+      )}
+
       {/* Idea. Folds away while the AIs work, so the working screen is what you see. */}
-      <section className="panel idea" hidden={picking2 || briefing || running || judging}>
+      <section className="panel idea" hidden={picking2 || briefing || running || judging || (settled && !askOpen)}>
         <div className="row"><label className="lbl" htmlFor="idea">Ask anything</label><span className="modepill">{!showChoice ? "Auto" : mode === "image" ? "Picture" : "Words"}</span></div>
         <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } }}
           placeholder="Type your question or what you want made. Rough is fine." />
@@ -512,6 +550,20 @@ export default function Home() {
             ))}
           </div>
         )}
+        {!modelsOpen && providers.some((p) => p.configured) && (!showChoice || sendable.length > 0) ? (
+          // One line instead of five chips. Before a pick it says what will happen; after, who is answering.
+          <button className="modelsline" aria-expanded={false} onClick={() => setModelsOpen(true)}>
+            {showChoice ? (<>
+              <span className="modelslogos">{sendable.map((id) => <Logo key={id} id={id} />)}</span>
+              <span>Asking {sendable.map(label).join(" + ")}</span>
+              <span className="muted">change</span>
+            </>) : (<>
+              <span className="modelslogos">{providers.filter((p) => p.configured).map((p) => <Logo key={p.id} id={p.id} />)}</span>
+              <span>It picks the AIs that suit the question</span>
+              <span className="muted">choose</span>
+            </>)}
+          </button>
+        ) : (
         <div className="chips models" role="group" aria-label="Which AIs answer">
           {providers.map((p) => {
             const disabled = !p.configured;
@@ -525,8 +577,6 @@ export default function Home() {
             );
           })}
         </div>
-        {!showChoice && providers.some((p) => p.configured) && (
-          <p className="hint">When you ask, it picks the kind of job and the AIs that suit it. Or tap chips to choose yourself.</p>
         )}
         {showChoice && !presetLocked && routed?.idea === idea && routed.why && (
           <p className="hint" role="status">{routed.guessed ? "" : "Picked for you: "}{routed.why} Tap a chip to change it.</p>
@@ -541,17 +591,8 @@ export default function Home() {
         )}
       </section>
 
-      {brief && (
-        <section className="panel briefpanel">
-          <div className="row briefhead">
-            <button className="brieftoggle" aria-expanded={briefOpen} aria-controls="brief" onClick={() => setBriefOpen((v) => !v)}>
-              <span className="lbl">{briefOpen ? "The question that was asked · edit it and ask again" : "See the question that was asked"}</span>
-            </button>
-            <button className="ghost small" onClick={() => { setBrief(""); setBriefFor(""); }}>Use my original instead</button>
-          </div>
-          {briefOpen && <textarea id="brief" rows={10} aria-label="Your improved question" value={brief} onChange={(e) => setBrief(e.target.value)} />}
-        </section>
-      )}
+      {/* The improved question: next to the box before a run, after the answer once there is one. */}
+      {briefPanel && !settled && briefPanel}
 
       {revising && (
         <Revise idea={idea} brief={runPrompt || brief || idea} mode={mode} project={projectCtx} brain={brain}
@@ -671,6 +712,8 @@ export default function Home() {
         </section>
       )}
 
+      {briefPanel && settled && briefPanel}
+
       {rounds.length > 0 && (
         <section className="rounds" aria-label="Earlier rounds">
           <h2 className="lbl">Earlier tries</h2>
@@ -715,7 +758,9 @@ export default function Home() {
         {done.length > 0 && !running && (
           <button className="ghost" aria-expanded={revising} onClick={() => { setRevising(true); setTimeout(() => document.querySelector(".revise")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Change something</button>
         )}
-        {finished ? (
+        {askAgain ? (
+          <button className="primary" disabled={!sendable.length} onClick={askAgain.go}>{askAgain.label}</button>
+        ) : finished ? (
           <button className="primary" onClick={startOver}>
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>New ask
           </button>
