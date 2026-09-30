@@ -24,6 +24,12 @@ async function shrink(src: string, max = 768): Promise<string | null> {
   }
 }
 
+/** Let the box grow with the text so nothing scrolls inside it on a phone. */
+function grow(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight + 2, 320)}px`;
+}
+
 export default function Revise(props: {
   idea: string; brief: string; mode: "text" | "image"; results: Returned[];
   project: { name: string; locked: string } | null; brain: string;
@@ -43,6 +49,7 @@ export default function Revise(props: {
     if (!text || busy) return;
     const next: Line[] = [...chat, { role: "them", text }];
     setChat(next); setDraft(""); setErr(""); setBusy(true);
+    if (box.current) box.current.style.height = "";
     try {
       const results = await Promise.all(props.results.map(async (r) => ({
         name: r.name, text: r.text, error: r.error,
@@ -93,10 +100,11 @@ export default function Revise(props: {
       <label className="sr" htmlFor="revise-say">Your answer</label>
       <textarea id="revise-say" ref={box} rows={3} maxLength={4000} value={draft} disabled={busy}
         placeholder="Say it in plain words. For example: shorter, keep Grok's layout, fix the commas."
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => { setDraft(e.target.value); grow(e.target); }}
+        onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)}
         onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); void say(); } }} />
       <div className="row reviseactions">
-        <span className="muted">Tap the microphone on your keyboard to speak instead of type.</span>
+        <span className="muted">Or tap the mic on your keyboard.</span>
         <button className="primary small" disabled={!draft.trim() || busy} onClick={say}>{busy ? "Working…" : answered ? "Send" : "Make the change and ask again"}</button>
       </div>
     </section>
