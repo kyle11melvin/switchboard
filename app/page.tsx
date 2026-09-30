@@ -321,6 +321,7 @@ export default function Home() {
   const nextStep = !sendable.length ? "Pick at least one AI above."
     : running ? (mode === "image" ? "Drawing. Pictures take about half a minute." : "Asking. Answers take up to a minute.")
     : judging ? "Working out the top answer. About a minute."
+    : done.length && failedCount === done.length ? (done.length > 1 ? "None of them answered. Tap Try again on each, or ask again." : "It didn't answer. Tap Try again.")
     : verdict ? "Done. Copy the answer, or tap Change something to adjust it."
     : done.length && mode === "image" ? "Done. Tap Save image to keep one, or Change something to adjust it."
     : done.length && canJudge ? "Answers are in. Tap Get the top answer."
@@ -445,7 +446,7 @@ export default function Home() {
             const files = Array.from(e.target.files ?? []).slice(0, 5 - photos.length);
             e.target.value = "";
             setPhotoNote("");
-            const added = (await Promise.all(files.map(shrinkFile))).filter((x): x is string => !!x);
+            const added = (await Promise.all(files.map((f) => shrinkFile(f)))).filter((x): x is string => !!x);
             if (added.length < files.length) setPhotoNote("One of those files couldn't be read as a photo.");
             if (added.length) setPhotos((all) => [...all, ...added].slice(0, 5));
           }} />
@@ -800,16 +801,24 @@ function ResultImage({ src, name, alt }: { src: string; name: string; alt: strin
 
 // A chosen photo, shrunk so a few of them still make a small request.
 async function shrinkFile(file: File, max = 1024): Promise<string | null> {
+  // Decode through an <img> so iPhone camera photos (HEIC, rotated) come out right.
+  const url = URL.createObjectURL(file);
   try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (w < 8 || h < 8) return null;
+    const scale = Math.min(1, max / Math.max(w, h));
     const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(bitmap.width * scale));
-    c.height = Math.max(1, Math.round(bitmap.height * scale));
-    c.getContext("2d")!.drawImage(bitmap, 0, 0, c.width, c.height);
+    c.width = Math.round(w * scale);
+    c.height = Math.round(h * scale);
+    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
     return c.toDataURL("image/jpeg", 0.85);
   } catch {
     return null;
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 
