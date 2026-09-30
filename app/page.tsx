@@ -157,6 +157,8 @@ export default function Home() {
   const label = (id: ProviderId) => byId[id]?.label ?? id;
 
   function applyPreset(p: Preset) {
+    // A brief is written for words or for a picture, never both. Switching kind makes the old one wrong.
+    if (p.mode !== mode) setBrief("");
     setPreset(p); setMode(p.mode); setSelected(p.models); setAutoJudge(p.judge);
   }
   function pickPreset(p: Preset) { setPresetLocked(true); applyPreset(p); }
@@ -279,6 +281,12 @@ export default function Home() {
   // Copy written as "Slide 1: … Slide 2: …" can be laid out as a carousel.
   const ideaSlides = useMemo(() => readSlides(idea), [idea]);
   const verdictSlides = useMemo(() => readSlides(bestAnswer(verdict)), [verdict]);
+  // Slides pasted while asking for a picture: laying them out becomes the main action.
+  const offerSlides = mode === "image" && ideaSlides.slides.length >= 2 && !carousel;
+  const openCarousel = (c: CarouselCopy) => {
+    setCarousel(c);
+    setTimeout(() => document.querySelector(".carousel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60);
+  };
   const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
 
@@ -372,11 +380,8 @@ export default function Home() {
         {mode === "image" && !selected.some((s) => byId[s]?.configured && byId[s]?.canImage) && (
           <p className="hint">No image-capable key yet (ChatGPT or Grok). The models below will write you a ready-to-paste image prompt instead.</p>
         )}
-        {mode === "image" && ideaSlides.slides.length >= 2 && !carousel && (
-          <div className="hint carouselhint">
-            <span>This reads as a {ideaSlides.slides.length}-slide carousel. An image AI draws one picture per request and often misspells text. Switchboard can lay out all {ideaSlides.slides.length} slides with your exact words.</span>
-            <button className="ghost small" onClick={() => { setCarousel(ideaSlides); setTimeout(() => document.querySelector(".carousel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Lay out the slides</button>
-          </div>
+        {offerSlides && (
+          <p className="hint">This reads as a {ideaSlides.slides.length}-slide carousel. An image AI draws one picture per request and often misspells text, so Switchboard can lay out all {ideaSlides.slides.length} slides itself with your exact words. Use the button below.</p>
         )}
         {mode === "image" && (
           <div className="chips styles" role="group" aria-label="Image style">
@@ -432,7 +437,7 @@ export default function Home() {
         <section className="panel verdict" aria-busy={judging}>
           <div className="row">
             <h2 className="lbl">Verdict {judging ? "" : `· judged blind by ${label(judgeWith)}`}</h2>
-            {verdict && verdictSlides.slides.length >= 2 && <button className="ghost small" onClick={() => { setCarousel(verdictSlides); setTimeout(() => document.querySelector(".carousel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Make carousel</button>}
+            {verdict && verdictSlides.slides.length >= 2 && <button className="ghost small" onClick={() => openCarousel(verdictSlides)}>Make carousel</button>}
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <Skeleton /> : (() => {
@@ -519,6 +524,12 @@ export default function Home() {
         </section>
       )}
 
+      {offerSlides ? (
+        <div className="actionbar">
+          <button className="ghost" disabled={!sendable.length || running} onClick={send}>{running ? "Drawing…" : "Draw with AI"}</button>
+          <button className="primary" onClick={() => openCarousel(ideaSlides)}>Lay out {ideaSlides.slides.length} slides</button>
+        </div>
+      ) : (
       <div className="actionbar">
         <button className="ghost" disabled={!idea.trim() || briefing} onClick={sharpen}>
           {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen"}
@@ -527,6 +538,7 @@ export default function Home() {
           {running ? `Running… ${done.length} of ${Object.keys(results).length} in` : sendable.length ? (sendable.length > 2 ? `Send to ${sendable.length} AIs` : `Send to ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
         </button>
       </div>
+      )}
     </main>
   );
 }

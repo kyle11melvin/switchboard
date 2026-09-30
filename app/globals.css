@@ -289,8 +289,6 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .whogrid input { width: 100%; background: var(--bg2); border: 1px solid var(--field-line); border-radius: var(--r-sm); padding: 10px 12px; font-size: max(16px, 1rem); }
 .slidesave { gap: 10px; }
 .slidesave .primary { min-width: 0; }
-.carouselhint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.carouselhint span { flex: 1 1 220px; min-width: 0; }
 .carousel { animation: open 200ms var(--ease-out) backwards; }
 
 /* History */
@@ -314,6 +312,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .actionbar .ghost { flex: 0 0 auto; }
+.actionbar .primary { min-width: 0; }
 
 /* Login */
 .login { min-height: 100vh; min-height: 100dvh; padding-bottom: 0; display: flex; align-items: center; justify-content: center; }
