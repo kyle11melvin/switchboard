@@ -267,29 +267,26 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .best p:first-child { margin-top: 0; }
 .best p:last-child { margin-bottom: 0; }
 
-/* Carousel: slides laid out from written copy */
-.carousel { display: flex; flex-direction: column; gap: 14px; }
-.slidestrip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; scroll-snap-type: x proximity; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
-.slidethumb { flex: none; width: min(62vw, 250px); aspect-ratio: 4 / 5; padding: 0; min-height: 0; border: 2px solid var(--line2); border-radius: var(--r-sm); background: var(--bg2); overflow: hidden; scroll-snap-align: center; }
-.slidethumb.on { border-color: var(--accent); }
-.slidethumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.slidewait { display: grid; place-items: center; height: 100%; font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
-.slidewait.bad { color: var(--red-text); }
-.slideedit { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
-.slideedit textarea { margin-top: 0; }
-.kinds { margin-top: 0; gap: 6px; }
-.fieldlbl { display: block; margin-top: 6px; font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
-.slideactions { margin-top: 8px; }
-.slideactions .danger { margin-top: 0; }
-.lookrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--line); }
-.lookrow .chips { margin-top: 0; gap: 6px; }
-.whoami { border-top: 1px solid var(--line); padding-top: 12px; }
-.whoami summary { min-height: 28px; cursor: pointer; font-weight: 700; font-size: 0.8125rem; color: var(--muted); }
-.whogrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 4px 12px; margin-top: 6px; }
-.whogrid input { width: 100%; background: var(--bg2); border: 1px solid var(--field-line); border-radius: var(--r-sm); padding: 10px 12px; font-size: max(16px, 1rem); }
-.slidesave { gap: 10px; }
-.slidesave .primary { min-width: 0; }
-.carousel { animation: open 200ms var(--ease-out) backwards; }
+/* Revise: a short conversation that becomes the next brief */
+.revise { display: flex; flex-direction: column; gap: 10px; animation: open 200ms var(--ease-out) backwards; }
+.revise textarea { margin-top: 0; }
+.talk { display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto; scrollbar-width: thin; }
+.talk p { margin: 0; max-width: 86%; padding: 9px 12px; border-radius: var(--r-sm); font-size: 0.9375rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.talk .asks { align-self: flex-start; background: var(--panel2); border: 1px solid var(--line); }
+.talk .says { align-self: flex-end; background: var(--bg2); border: 1px solid var(--field-line); }
+.talk .thinking { color: var(--muted); border-style: dashed; }
+.reviseactions { justify-content: space-between; }
+.reviseactions .muted { flex: 1 1 180px; min-width: 0; margin: 0; }
+
+/* Rounds: earlier trips out and back, kept for comparing */
+.rounds { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.roundnow { margin: 4px 2px 10px; }
+.round { border: 1px solid var(--line); border-radius: var(--r); padding: 4px 14px; background: rgba(var(--white-rgb), 0.015); }
+.round[open] { padding-bottom: 14px; }
+.round > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; font-size: 0.875rem; }
+.round .grid { margin-top: 12px; }
+.roundbrief summary { min-height: 28px; cursor: pointer; font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
+.roundbrief p { margin: 6px 0 0; font-size: 0.8125rem; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 75ch; }
 
 /* History */
 .syncline { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--line); font-size: 0.8125rem; color: var(--muted); }
@@ -403,7 +400,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
   /* No movement: reveals become short fades, the loading shimmer becomes a slow pulse, presses don't shift. */
   .best { animation: settle 200ms ease-out backwards; }
   .best::before { animation: none; }
-  .lockeditor, .briefpanel, .newproject, .carousel, .panel[aria-label="History"] { animation-name: settle; }
+  .lockeditor, .briefpanel, .newproject, .revise, .panel[aria-label="History"] { animation-name: settle; }
   .skeleton span { background: var(--line); animation: breathe 1.6s ease-in-out infinite alternate; }
   button:active:not(:disabled) { transform: none; }
   .knob { transition: none; }

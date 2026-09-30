@@ -105,3 +105,35 @@ export function judgeUserPrompt(brief: string, answers: { letter: string; text: 
 export function writeUserPrompt(brief: string, bestParts: string, redFlags: string) {
   return `# BRIEF (written for the models; where it asks for several options, you deliver one)\n${brief}\n\n# BEST PARTS\n${bestParts}\n\n# DO NOT USE\n${redFlags || "None."}\n\n# REMINDER\nWrite exactly one final answer, built piece by piece from the best parts above. No "Option 1 / Option 2". No notes before or after it.`;
 }
+
+// Revising: after the results are in, the person says what they'd change, and that becomes the next brief.
+export const REVISE_SYSTEM = `You help one person revise a brief after they've seen what several AI models produced from it.
+
+You are given: their original idea, the brief that was sent, what each model returned (text, and pictures when there are any, each labelled with the model's name), and the conversation so far, where they say what they want changed.
+
+Your reply is one of two things, and nothing else:
+
+QUESTION: one short question
+Ask only when something that would change the brief is truly unclear. Never ask more than two questions in a conversation; if two have been asked, write the brief and state your assumption inside it. Do not ask about things you can see for yourself in the results.
+
+BRIEF:
+the complete rewritten brief
+Write the whole brief again, ready to send, in the same form as the brief that was sent. If that brief was a prompt for an image model, the new one is also a pure image prompt with no headings, because it is sent to the image model word for word.
+
+Rules for the brief:
+- The models that receive it cannot see the earlier results or each other's work. "Keep Grok's layout" means nothing to them. Describe what to keep in plain, specific words: the layout, the colors, the wording, the parts.
+- Change what the person asked to change. Keep what they did not mention, unless it conflicts.
+- Fix plain defects you can see even if they only hinted at them (for example numbers written "$12.430.10" when "$12,430.10" is meant), and spell the correct form out exactly.
+- Do not add requirements they did not ask for.\n\n${HOUSE_RULES}`;
+
+export function reviseUserPrompt(input: {
+  idea: string; brief: string; mode: string;
+  results: { name: string; text?: string; error?: string; hasImage?: boolean }[];
+  chat: { role: "you" | "them"; text: string }[];
+}) {
+  const results = input.results.map((r) =>
+    `### ${r.name}\n${r.error ? `Failed: ${r.error}` : [r.hasImage ? "(its picture is shown above, labelled with its name)" : "", r.text ?? ""].filter(Boolean).join("\n")}`,
+  ).join("\n\n");
+  const chat = input.chat.map((m) => `${m.role === "you" ? "YOU ASKED" : "THEY SAID"}: ${m.text}`).join("\n");
+  return `# ORIGINAL IDEA\n${input.idea}\n\n# BRIEF THAT WAS SENT (${input.mode === "image" ? "an image prompt" : "a text brief"})\n${input.brief}\n\n# WHAT CAME BACK\n${results}\n\n# CONVERSATION\n${chat}`;
+}

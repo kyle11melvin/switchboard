@@ -104,10 +104,20 @@ async function postJSON(url: string, headers: Record<string, string>, body: unkn
 }
 
 // OpenAI-compatible chat (OpenAI, xAI, Perplexity all share this shape)
-async function openAICompatible(url: string, apiKey: string, model: string, system: string, prompt: string) {
+// A picture shown to a model alongside the prompt, as a data URL ("data:image/jpeg;base64,…").
+export interface Shown { label: string; dataUrl: string }
+const parts = (img: Shown) => { const m = /^data:(image\/[a-z+.-]+);base64,(.+)$/i.exec(img.dataUrl); return m ? { type: m[1], data: m[2] } : null; };
+
+async function openAICompatible(url: string, apiKey: string, model: string, system: string, prompt: string, shown: Shown[] = []) {
+  const seen = shown.filter((i) => parts(i));
   const messages = [
     ...(system ? [{ role: "system", content: system }] : []),
-    { role: "user", content: prompt },
+    {
+      role: "user",
+      content: seen.length
+        ? [...seen.flatMap((i) => [{ type: "text", text: i.label }, { type: "image_url", image_url: { url: i.dataUrl } }]), { type: "text", text: prompt }]
+        : prompt,
+    },
   ];
   const data = await postJSON(url, { authorization: `Bearer ${apiKey}` }, { model, messages });
   const text: string = data?.choices?.[0]?.message?.content ?? "";
@@ -116,7 +126,8 @@ async function openAICompatible(url: string, apiKey: string, model: string, syst
   return { text, citations };
 }
 
-export async function runText(id: ProviderId, system: string, prompt: string): Promise<RunResult> {
+// `shown` lets the model look at pictures too. Perplexity can't, so it gets the words only.
+export async function runText(id: ProviderId, system: string, prompt: string, shown: Shown[] = []): Promise<RunResult> {
   const t0 = Date.now();
   const model = PROVIDERS[id].textModel();
   try {
@@ -124,10 +135,10 @@ export async function runText(id: ProviderId, system: string, prompt: string): P
     let citations: string[] = [];
     switch (id) {
       case "openai":
-        ({ text } = await openAICompatible("https://api.openai.com/v1/chat/completions", key(id), model, system, prompt));
+        ({ text } = await openAICompatible("https://api.openai.com/v1/chat/completions", key(id), model, system, prompt, shown));
         break;
       case "xai":
-        ({ text } = await openAICompatible("https://api.x.ai/v1/chat/completions", key(id), model, system, prompt));
+        ({ text } = await openAICompatible("https://api.x.ai/v1/chat/completions", key(id), model, system, prompt, shown));
         break;
       case "perplexity":
         ({ text, citations } = await openAICompatible("https://api.perplexity.ai/chat/completions", key(id), model, system, prompt));
@@ -136,7 +147,16 @@ export async function runText(id: ProviderId, system: string, prompt: string): P
         const data = await postJSON(
           "https://api.anthropic.com/v1/messages",
           { "x-api-key": key(id), "anthropic-version": "2023-06-01" },
-          { model, max_tokens: 8000, system: system || undefined, messages: [{ role: "user", content: prompt }] },
+          {
+            model, max_tokens: 8000, system: system || undefined,
+            messages: [{
+              role: "user",
+              content: [
+                ...shown.flatMap((i) => { const p = parts(i); return p ? [{ type: "text", text: i.label }, { type: "image", source: { type: "base64", media_type: p.type, data: p.data } }] : []; }),
+                { type: "text", text: prompt },
+              ],
+            }],
+          },
         );
         text = (data?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
         break;
@@ -147,7 +167,13 @@ export async function runText(id: ProviderId, system: string, prompt: string): P
           {},
           {
             ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            contents: [{
+              role: "user",
+              parts: [
+                ...shown.flatMap((i) => { const p = parts(i); return p ? [{ text: i.label }, { inlineData: { mimeType: p.type, data: p.data } }] : []; }),
+                { text: prompt },
+              ],
+            }],
           },
         );
         text = (data?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("");

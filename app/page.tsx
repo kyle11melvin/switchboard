@@ -7,7 +7,6 @@ import { predictPreset } from "@/lib/predict";
 import { IMAGE_STYLES } from "@/lib/imageStyles";
 import { HISTORY_LIMIT, isProject, isRun, mergeNewest, tidyRuns } from "@/lib/merge";
 import { useSync } from "./useSync";
-import { readSlides, type Carousel as CarouselCopy } from "@/lib/slides";
 
 type ProviderId = "openai" | "anthropic" | "xai" | "perplexity" | "gemini";
 type Mode = "text" | "image";
@@ -78,7 +77,10 @@ const DOMAIN: Record<ProviderId, string> = { openai: "openai.com", anthropic: "a
 const MONO: Record<ProviderId, string> = { openai: "C", anthropic: "A", xai: "X", perplexity: "P", gemini: "G" };
 
 // The markdown renderer is the heaviest code on the page and isn't needed until an answer lands, so it loads separately.
-const Carousel = dynamic(() => import("./Carousel"), { ssr: false, loading: () => <Skeleton /> });
+const Revise = dynamic(() => import("./Revise"), { ssr: false, loading: () => <Skeleton /> });
+
+// One trip out to the AIs and back. Earlier rounds stay on screen so they can be compared.
+interface Round { n: number; brief: string; mode: Mode; results: RunResult[]; verdict: string }
 const loadMarkdown = () => import("./Markdown");
 const Markdown = dynamic(loadMarkdown, { ssr: false, loading: () => <Skeleton /> });
 
@@ -107,7 +109,8 @@ export default function Home() {
 
   const [brief, setBrief] = useState("");
   const [briefing, setBriefing] = useState(false);
-  const [carousel, setCarousel] = useState<CarouselCopy | null>(null); // slides being laid out, when that panel is open
+  const [rounds, setRounds] = useState<Round[]>([]);   // earlier rounds of this idea, oldest first
+  const [revising, setRevising] = useState(false);     // the Revise conversation is open
   const [showAnswers, setShowAnswers] = useState(false); // individual answers, once a verdict has replaced them
   const [briefOpen, setBriefOpen] = useState(true); // folds away once answers arrive, so the verdict is what you see
   const [results, setResults] = useState<Record<string, RunResult | "loading">>({});
@@ -152,7 +155,7 @@ export default function Home() {
   const project = shownProjects.find((p) => p.id === projectId) ?? shownProjects[0];
   const projectCtx = project && project.id !== "none" ? { name: project.name, locked: project.locked } : null;
   const styleNote = mode === "image" ? IMAGE_STYLES.find((x) => x.id === imgStyle)?.note : undefined;
-  const noteFor = [preset.note, styleNote].filter(Boolean).join("\n\n") || undefined;
+  const noteFor = [preset.mode === mode ? preset.note : undefined, styleNote].filter(Boolean).join("\n\n") || undefined;
   const byId = useMemo(() => Object.fromEntries(providers.map((p) => [p.id, p])), [providers]);
   const label = (id: ProviderId) => byId[id]?.label ?? id;
 
@@ -245,6 +248,9 @@ export default function Home() {
     const targets = selected.filter((s) => byId[s]?.configured);
     // Cmd+Enter lands here too, so guard against a second run while one is in flight.
     if (!prompt || !targets.length || running) return;
+    // Sending again keeps what came back last time as an earlier round.
+    if (done.length) setRounds((all) => [...all, { n: all.length + 1, brief: runPrompt, mode, results: done, verdict }]);
+    setRevising(false);
     setErr(""); setVerdict(""); setBriefOpen(false); setShowAnswers(false);
     const id = uid(); setRunId(id); setRunPrompt(prompt); activeRun.current = id;
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
@@ -269,8 +275,12 @@ export default function Home() {
 
   function openHistory(h: HistoryItem) {
     setIdea(h.idea); setBrief(h.brief === h.idea ? "" : h.brief); setMode(h.mode);
+    // Keep the task chip in step with the kind of run, or its instructions would leak into the wrong kind.
+    if (h.mode === "image" && preset.mode !== "image") { const p = PRESETS.find((x) => x.mode === "image"); if (p) { setPreset(p); setSelected(p.models); setAutoJudge(p.judge); } }
+    if (h.mode === "text" && preset.mode !== "text") { const p = PRESETS.find((x) => x.id === (predictPreset(h.idea) ?? "copy")) ?? PRESETS.find((x) => x.mode === "text"); if (p) { setPreset(p); setSelected(p.models); setAutoJudge(p.judge); } }
+    setPresetLocked(true);
     setResults(Object.fromEntries(h.results.map((r) => [r.provider, r])));
-    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false); setShowAnswers(false);
+    setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false); setShowAnswers(false); setRounds([]); setRevising(false);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
   }
 
@@ -278,15 +288,6 @@ export default function Home() {
   const done = Object.values(results).filter((r) => r !== "loading") as RunResult[];
   const running = Object.values(results).some((r) => r === "loading");
   const failedCount = done.filter((r) => r.error).length;
-  // Copy written as "Slide 1: … Slide 2: …" can be laid out as a carousel.
-  const ideaSlides = useMemo(() => readSlides(idea), [idea]);
-  const verdictSlides = useMemo(() => readSlides(bestAnswer(verdict)), [verdict]);
-  // Slides pasted while asking for a picture: laying them out becomes the main action.
-  const offerSlides = mode === "image" && ideaSlides.slides.length >= 2 && !carousel;
-  const openCarousel = (c: CarouselCopy) => {
-    setCarousel(c);
-    setTimeout(() => document.querySelector(".carousel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60);
-  };
   const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
 
@@ -300,7 +301,7 @@ export default function Home() {
             <option value="__new">+ New project…</option>
           </select>
           {Object.keys(results).length > 0 && (
-            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setCarousel(null); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
+            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setRounds([]); setRevising(false); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           )}
@@ -380,9 +381,6 @@ export default function Home() {
         {mode === "image" && !selected.some((s) => byId[s]?.configured && byId[s]?.canImage) && (
           <p className="hint">No image-capable key yet (ChatGPT or Grok). The models below will write you a ready-to-paste image prompt instead.</p>
         )}
-        {offerSlides && (
-          <p className="hint">This reads as a {ideaSlides.slides.length}-slide carousel. An image AI draws one picture per request and often misspells text, so Switchboard can lay out all {ideaSlides.slides.length} slides itself with your exact words. Use the button below.</p>
-        )}
         {mode === "image" && (
           <div className="chips styles" role="group" aria-label="Image style">
             {IMAGE_STYLES.map((st) => (
@@ -417,7 +415,7 @@ export default function Home() {
         <section className="panel briefpanel">
           <div className="row briefhead">
             <button className="brieftoggle" aria-expanded={briefOpen} aria-controls="brief" onClick={() => setBriefOpen((v) => !v)}>
-              <span className="lbl">{briefOpen ? "Brief · this is what gets sent" : "Brief · tap to open"}</span>
+              <span className="lbl">{briefOpen ? (brief !== runPrompt && done.length ? `Brief for round ${rounds.length + 2} · this is what gets sent` : "Brief · this is what gets sent") : "Brief · tap to open"}</span>
             </button>
             <button className="ghost small" onClick={() => setBrief("")}>Discard</button>
           </div>
@@ -425,7 +423,16 @@ export default function Home() {
         </section>
       )}
 
-      {carousel && <Carousel key={carousel.slides.map((x) => x.headline).join("|")} slides={carousel.slides} caption={carousel.caption} onClose={() => setCarousel(null)} />}
+      {revising && (
+        <Revise idea={idea} brief={runPrompt || brief || idea} mode={mode} project={projectCtx} brain={brain}
+          results={done.map((r) => ({ name: label(r.provider), text: r.text, error: r.error, images: r.images }))}
+          onClose={() => setRevising(false)}
+          onBrief={(b) => {
+            setBrief(b); setBriefOpen(true); setRevising(false);
+            setAnnounce("New brief ready. Edit it if you like, then send.");
+            setTimeout(() => document.querySelector(".briefpanel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60);
+          }} />
+      )}
 
       {err && <div className="error" role="alert">{err}</div>}
       <div className="sr" role="status" aria-live="polite">{announce}</div>
@@ -437,7 +444,6 @@ export default function Home() {
         <section className="panel verdict" aria-busy={judging}>
           <div className="row">
             <h2 className="lbl">Verdict {judging ? "" : `· judged blind by ${label(judgeWith)}`}</h2>
-            {verdict && verdictSlides.slides.length >= 2 && <button className="ghost small" onClick={() => openCarousel(verdictSlides)}>Make carousel</button>}
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <Skeleton /> : (() => {
@@ -478,6 +484,7 @@ export default function Home() {
         </button>
       )}
 
+      {rounds.length > 0 && Object.keys(results).length > 0 && <h2 className="lbl roundnow">Round {rounds.length + 1}</h2>}
       {Object.keys(results).length > 0 && (!verdict || judging || showAnswers) && (
         <section className={`grid n${Object.keys(results).length}`}>
           {Object.entries(results).map(([pid, r]) => (
@@ -512,6 +519,32 @@ export default function Home() {
         </section>
       )}
 
+      {rounds.length > 0 && (
+        <section className="rounds" aria-label="Earlier rounds">
+          <h2 className="lbl">Earlier rounds</h2>
+          {[...rounds].reverse().map((r) => (
+            <details key={r.n} className="round">
+              <summary>Round {r.n} · {r.results.map((x) => label(x.provider)).join(", ")}</summary>
+              <details className="roundbrief"><summary>The brief that was sent</summary><p>{r.brief}</p></details>
+              {r.verdict && <div className="best md"><Markdown text={bestAnswer(r.verdict)} /></div>}
+              <div className={`grid n${r.results.length}`}>
+                {r.results.map((x) => (
+                  <article key={x.provider} className="card">
+                    <div className="cardhead"><h3 className="cardname"><Logo id={x.provider} />{label(x.provider)}</h3></div>
+                    {x.error ? <div className="error carderr"><span>{x.error}</span></div> : (
+                      <>
+                        {x.images?.map((src, i) => <ResultImage key={i} src={src} name={`switchboard-round${r.n}-${x.provider}-${i + 1}`} alt={`Round ${r.n} image from ${label(x.provider)}`} />)}
+                        {x.text && <div className="md"><Markdown text={x.text} /></div>}
+                      </>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </details>
+          ))}
+        </section>
+      )}
+
       {providers.length > 0 && providers.every((p) => !p.configured) && (
         <div className="error" role="alert">No API keys found. Add them in Vercel → Settings → Environment Variables (see README), then redeploy.</div>
       )}
@@ -524,21 +557,18 @@ export default function Home() {
         </section>
       )}
 
-      {offerSlides ? (
-        <div className="actionbar">
-          <button className="ghost" disabled={!sendable.length || running} onClick={send}>{running ? "Drawing…" : "Draw with AI"}</button>
-          <button className="primary" onClick={() => openCarousel(ideaSlides)}>Lay out {ideaSlides.slides.length} slides</button>
-        </div>
-      ) : (
       <div className="actionbar">
-        <button className="ghost" disabled={!idea.trim() || briefing} onClick={sharpen}>
-          {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen"}
-        </button>
+        {done.length > 0 && !running ? (
+          <button className="ghost" aria-expanded={revising} onClick={() => { setRevising(true); setTimeout(() => document.querySelector(".revise")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Revise</button>
+        ) : (
+          <button className="ghost" disabled={!idea.trim() || briefing} onClick={sharpen}>
+            {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen"}
+          </button>
+        )}
         <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={send}>
           {running ? `Running… ${done.length} of ${Object.keys(results).length} in` : sendable.length ? (sendable.length > 2 ? `Send to ${sendable.length} AIs` : `Send to ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
         </button>
       </div>
-      )}
     </main>
   );
 }
