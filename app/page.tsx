@@ -179,9 +179,9 @@ export default function Home() {
     document.addEventListener("pointerdown", away); document.addEventListener("keydown", key);
     return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", key); };
   }, [picking]);
-  function onIdeaChange(v: string) {
+  function onIdeaChange(v: string, withPhotos = photos.length > 0) {
     setIdea(v);
-    const id = predictPreset(v);
+    const id = predictPreset(v, { photos: withPhotos });
     setPredicted(id);
     if (!presetLocked && id && id !== preset.id) {
       const p = PRESETS.find((x) => x.id === id);
@@ -448,7 +448,7 @@ export default function Home() {
             setPhotoNote("");
             const added = (await Promise.all(files.map((f) => shrinkFile(f)))).filter((x): x is string => !!x);
             if (added.length < files.length) setPhotoNote("One of those files couldn't be read as a photo.");
-            if (added.length) setPhotos((all) => [...all, ...added].slice(0, 5));
+            if (added.length) { setPhotos((all) => [...all, ...added].slice(0, 5)); onIdeaChange(idea, true); }
           }} />
           {photoNote && <span className="muted">{photoNote}</span>}
         </div>
