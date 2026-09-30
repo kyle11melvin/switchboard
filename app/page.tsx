@@ -133,7 +133,8 @@ export default function Home() {
   const [runId, setRunId] = useState<string | null>(null);
   const [runPrompt, setRunPrompt] = useState("");
   const [askedIdea, setAskedIdea] = useState("");
-  const [askOpen, setAskOpen] = useState(false); // after a run the idea panel folds to one line; Edit reopens it
+  const [askOpen, setAskOpen] = useState(false);
+  const [changeNote, setChangeNote] = useState(""); // what they asked to change, shown on the next try // after a run the idea panel folds to one line; Edit reopens it
   const [useOriginal, setUseOriginal] = useState(false); // "Use my original instead": next ask sends the raw idea
   const [fromHistory, setFromHistory] = useState(false); // a picture run opened from history has no pictures; offer Redraw
   const [modelsOpen, setModelsOpen] = useState(false); // the AI row is one line until tapped
@@ -296,7 +297,7 @@ export default function Home() {
   function startOver() {
     activeRun.current = null; setRunId(null); setRunPrompt(""); setAskedIdea(""); setErr(""); setNotice(""); setPhotos([]); setRounds([]); setRevising(false);
     setResults({}); setVerdict(""); setBrief(""); setBriefFor(""); setIdea(""); setPresetLocked(false); setModelsLocked(false); setRouted(null);
-    setAskOpen(false); setUseOriginal(false); setFromHistory(false); setModelsOpen(false);
+    setAskOpen(false); setUseOriginal(false); setFromHistory(false); setModelsOpen(false); setChangeNote("");
     // A fresh question starts as words. Otherwise a picture run would quietly make the next question a picture too.
     if (mode !== "text") applyPreset(PRESETS[1]);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
@@ -366,7 +367,7 @@ export default function Home() {
   const failedCount = done.filter((r) => r.error).length;
   const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
-  // Results are in and the question hasn't been edited since: the next move is New ask, not asking the same thing again.
+  // Results are in and the question hasn't been edited since: the next move is Next question, not asking the same thing again.
   const settled = done.length > 0 && !running && !judging && !briefing;
   // An edited improved question, "use my original", or a history picture run each have their own ask-again.
   const briefEdited = settled && !!brief.trim() && !!runPrompt && brief.trim() !== runPrompt.trim();
@@ -379,16 +380,16 @@ export default function Home() {
   const nextStep = !anyAI ? "No AIs are set up yet."
     : showChoice && !sendable.length ? "Pick at least one AI above."
     : picking2 ? "Working out what kind of job this is and who should answer."
-    : running ? (mode === "image" ? "Drawing. Pictures take about half a minute." : "Asking. Answers take up to a minute.")
+    : running ? (mode === "image" ? "Drawing. Each picture shows below as it lands." : "Asking. Each answer shows below as it lands.")
     : judging ? "Working out the top answer. About a minute."
     : done.length && failedCount === done.length ? (done.length > 1 ? "None of them answered. Tap Try again on each, or ask again." : "It didn't answer. Tap Try again.")
     : askAgain ? (useOriginal ? "Tap Ask with my original to send your words as typed." : briefEdited ? "Tap Ask again with this to send the edited question." : "Pictures aren't kept. Tap Redraw to make them again.")
     : done.length && !finished ? `Tap ${askLabel} to ask the new question.`
-    : verdict ? "Done. Copy the answer. Change something to adjust it, or New ask to move on."
-    : done.length && mode === "image" ? "Done. Save the one you like. Change something to adjust it, or New ask to move on."
+    : verdict ? "Done. Copy the answer, or tap Next question to ask something else."
+    : done.length && mode === "image" ? "Done. Save the one you like, or tap Next question to ask something else."
     : done.length && failedCount > 0 && mode === "text" && !verdict && !canJudge ? `${done.filter((r) => r.error).map((r) => label(r.provider)).join(" and ")} didn't answer. Tap Try again on it to get the top answer.`
     : done.length && canJudge ? "Answers are in. Tap Get the top answer."
-    : done.length ? "Done. Change something to adjust it, or New ask to move on."
+    : done.length ? "Done. Tap Next question to ask something else."
     : briefing ? "Improving your question first."
     : idea.trim() && !showChoice ? `Tap Ask. It picks the AIs, improves your question, then asks.${photos.length ? " Your photos go along." : ""}`
     : idea.trim() ? `Tap ${askLabel}. It improves your question first, then asks.${photos.length ? " Your photos go along." : ""}`
@@ -443,12 +444,13 @@ export default function Home() {
 
       {showHistory && (
         <section className="panel" aria-label="History">
+          <div className="row"><h2 className="lbl">History</h2><button className="ghost small" onClick={() => setShowHistory(false)}>Close</button></div>
           <SyncLine status={sync.status} onRetry={sync.syncNow} />
           {history.length === 0 && <p className="muted">Nothing asked yet.</p>}
           {(showAllHistory ? history : history.slice(0, HISTORY_PAGE)).map((h) => (
             <button key={h.id} className="hist" onClick={() => openHistory(h)}>
               <span>{h.idea.trim().slice(0, 90) || h.brief.trim().slice(0, 90) || "Untitled question"}</span>
-              <small>{new Date(h.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · {h.results.map((r) => label(r.provider)).join(", ")}{h.verdict ? " · judged" : ""}{h.projectName ? ` · ${h.projectName}` : ""}</small>
+              <small>{new Date(h.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · {h.results.map((r) => label(r.provider)).join(", ")}{h.mode === "image" ? " · picture" : h.verdict ? " · top answer" : ""}{h.projectName ? ` · ${h.projectName}` : ""}</small>
             </button>
           ))}
           {history.length > HISTORY_PAGE && !showAllHistory && (
@@ -499,7 +501,11 @@ export default function Home() {
       {settled && !askOpen && (
         <section className="panel asked">
           <div className="row askedrow">
-            <div className="askedtext"><span className="lbl">You asked</span><p>{askedIdea || runPrompt}</p></div>
+            <div className="askedtext">
+              <span className="lbl">You asked{rounds.length > 0 ? ` · try ${rounds.length + 1}` : ""}</span>
+              <p>{askedIdea || runPrompt}</p>
+              {rounds.length > 0 && changeNote && <p className="muted changed">Change: {changeNote}</p>}
+            </div>
             <button className="ghost small" onClick={() => { setAskOpen(true); setTimeout(() => document.getElementById("idea")?.focus({ preventScroll: true }), 50); }}>Edit</button>
           </div>
           {photos.length > 0 && <div className="photorow small">{photos.map((src, i) => <span key={i} className="photo"><img src={src} alt={`Attached photo ${i + 1}`} /></span>)}</div>}
@@ -599,9 +605,9 @@ export default function Home() {
         <Revise idea={idea} brief={runPrompt || brief || idea} mode={mode} project={projectCtx} brain={brain}
           results={done.map((r) => ({ name: label(r.provider), text: r.text, error: r.error, images: r.images }))}
           onClose={() => setRevising(false)}
-          onBrief={(b) => {
+          onBrief={(b, said) => {
             // One step: the change becomes the new question and goes straight out.
-            setBrief(b); setBriefFor(idea); setBriefOpen(false); setRevising(false);
+            setBrief(b); setBriefFor(idea); setBriefOpen(false); setRevising(false); setChangeNote(said);
             void send(b);
           }} />
       )}
@@ -678,10 +684,10 @@ export default function Home() {
         </button>
       )}
 
-      {rounds.length > 0 && Object.keys(results).length > 0 && <h2 className="lbl roundnow">Try {rounds.length + 1}</h2>}
       {Object.keys(results).length > 0 && (!verdict || judging || showAnswers) && (
         <section className={`grid n${Object.keys(results).length}`}>
-          {Object.entries(results).map(([pid, r]) => (
+          {/* The working panel already lists who is still thinking, so a card appears only once its answer is in. */}
+          {Object.entries(results).filter(([, r]) => r !== "loading").map(([pid, r]) => (
             <article key={pid} className="card" aria-busy={r === "loading"}>
               <div className="cardhead">
                 <h3 className="cardname"><Logo id={pid as ProviderId} />{label(pid as ProviderId)}</h3>
@@ -763,7 +769,7 @@ export default function Home() {
           <button className="primary" disabled={!sendable.length} onClick={askAgain.go}>{askAgain.label}</button>
         ) : finished ? (
           <button className="primary" onClick={startOver}>
-            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>New ask
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>Next question
           </button>
         ) : (
           <button className="primary" disabled={!idea.trim() || !anyAI || (showChoice && !sendable.length) || running || briefing || picking2} onClick={() => send()}>

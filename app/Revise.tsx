@@ -33,7 +33,7 @@ function grow(el: HTMLTextAreaElement) {
 export default function Revise(props: {
   idea: string; brief: string; mode: "text" | "image"; results: Returned[];
   project: { name: string; locked: string } | null; brain: string;
-  onBrief: (brief: string) => void; onClose: () => void;
+  onBrief: (brief: string, said: string) => void; onClose: () => void;
 }) {
   const [chat, setChat] = useState<Line[]>([{ role: "you", text: "What do you want changed?" }]);
   const [draft, setDraft] = useState("");
@@ -69,7 +69,7 @@ export default function Revise(props: {
       if (!d) throw new Error(res.status === 504 ? "Timed out. Try again." : "Got an unreadable reply. Try again.");
       if (d.error) throw new Error(d.error);
       if (d.question) { setChat([...next, { role: "you", text: d.question }]); box.current?.focus({ preventScroll: true }); return; }
-      if (d.brief) { props.onBrief(d.brief); return; }
+      if (d.brief) { props.onBrief(d.brief, next.filter((m) => m.role === "them").map((m) => m.text).join(" · ")); return; }
       throw new Error("Nothing came back. Try again.");
     } catch (e: any) {
       // Put their words back so nothing typed is lost.

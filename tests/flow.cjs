@@ -67,7 +67,7 @@ const hint = (p) => p.locator(".nextstep").textContent().then((t) => t.trim());
       ok("the judge graded and then wrote", c.some((x) => /gatekeeper/.test(x.system)) && c.some((x) => /final answer/.test(x.system)));
       ok("top answer shown", /top answer/i.test(await p.locator(".verdict .best").textContent()));
       ok("how it got there is folded", !(await p.locator(".grading").first().evaluate((d) => d.open)));
-      ok("after results the bar offers Change something and New ask", (await bar(p)) === "Change something | New ask", await bar(p));
+      ok("after results the bar offers Change something and Next question", (await bar(p)) === "Change something | Next question", await bar(p));
       ok("the form folds to one line so the answer comes first", (await p.locator(".asked").count()) === 1 && /rate buydowns/.test(await p.locator(".asked").textContent()) && (await p.locator("#idea").isHidden()));
       ok("the top answer is on the first screen (phone)", await p.evaluate(() => { const r = document.querySelector(".verdict").getBoundingClientRect(); return r.top < window.innerHeight * 0.6; }));
       // Change something
@@ -80,15 +80,15 @@ const hint = (p) => p.locator(".nextstep").textContent().then((t) => t.trim());
       await p.waitForSelector(".verdict .best p", { timeout: 30000 });
       ok("a change re-asks with a revised brief", calls().some((x) => /revise a brief/.test(x.system)));
       ok("earlier round is kept", (await p.locator("details.round").count()) === 1);
-      // Edit the idea → Ask comes back; New ask clears
+      // Edit the idea → Ask comes back; Next question clears
       await p.getByRole("button", { name: "Edit" }).click();
       ok("Edit reopens the form", await p.locator("#idea").isVisible());
       await p.fill("#idea", "Write an instagram post about rate buydowns for first-time buyers");
       ok("editing the question brings Ask back", /^Ask /.test(await p.locator(".actionrow .primary").textContent()));
       await p.fill("#idea", "Write an instagram post about rate buydowns");
-      await p.getByRole("button", { name: "New ask" }).click();
+      await p.getByRole("button", { name: "Next question" }).click();
       await sleep(300);
-      ok("New ask clears everything and focuses the box", (await p.inputValue("#idea")) === "" && (await p.locator(".verdict").count()) === 0 && (await p.evaluate(() => document.activeElement?.id)) === "idea");
+      ok("Next question clears everything and focuses the box", (await p.inputValue("#idea")) === "" && (await p.locator(".verdict").count()) === 0 && (await p.evaluate(() => document.activeElement?.id)) === "idea");
       ok("history has the runs", (await p.locator(".badge").first().textContent()) === "2");
       await p.locator(".modelsline").click();
       ok("tapping the AI line opens the chips", (await p.locator(".chips.models .chip").count()) === 5);
@@ -114,10 +114,10 @@ const hint = (p) => p.locator(".nextstep").textContent().then((t) => t.trim());
       ok("a photo plus a scene was picked as a picture", /Creative image/.test(await p.locator(".chip.on").first().textContent()));
       ok("Save image is offered", (await p.getByRole("button", { name: "Save image" }).count()) === 2);
       ok("hint says what to do with pictures", /Save/.test(await hint(p)));
-      await p.getByRole("button", { name: "New ask" }).click();
+      await p.getByRole("button", { name: "Next question" }).click();
       await sleep(200);
-      ok("New ask clears the photo", (await p.locator(".photo").count()) === 0);
-      ok("New ask starts fresh (nothing chosen, picks on Ask)", /Auto/i.test(await p.locator(".modepill").textContent()) && (await p.locator(".chip.on").count()) === 0);
+      ok("Next question clears the photo", (await p.locator(".photo").count()) === 0);
+      ok("Next question starts fresh (nothing chosen, picks on Ask)", /Auto/i.test(await p.locator(".modepill").textContent()) && (await p.locator(".chip.on").count()) === 0);
       // Reopen the picture run from history: no pictures kept, so the button offers Redraw
       await p.getByRole("button", { name: /History/ }).click();
       await p.locator("[aria-label=History] button.hist").first().click();

@@ -204,6 +204,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .askedrow { align-items: center; flex-wrap: nowrap; gap: 12px; }
 .askedtext { flex: 1; min-width: 0; }
 .askedtext p { margin: 2px 0 0; font-size: 0.9375rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.askedtext .changed { font-size: 0.8125rem; margin-top: 4px; -webkit-line-clamp: 1; }
 .photorow.small { margin-top: 8px; }
 .photorow.small .photo { width: 36px; height: 36px; }
 .photorow.small .photo img { border-radius: 8px; }
@@ -342,6 +343,8 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .talk .thinking { color: var(--muted); border-style: dashed; }
 .reviseactions { justify-content: space-between; }
 .reviseactions .muted { flex: 1 1 180px; min-width: 0; margin: 0; }
+/* On a phone the send button spans the panel, in reach of a thumb. */
+@media (max-width: 640px) { .reviseactions .primary { flex: 1 1 100%; } }
 
 /* Rounds: earlier trips out and back, kept for comparing */
 .rounds { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
