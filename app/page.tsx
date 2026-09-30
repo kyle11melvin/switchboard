@@ -109,7 +109,8 @@ export default function Home() {
   const [judgeWith, setJudgeWith] = useState<ProviderId>("anthropic");
 
   const [brief, setBrief] = useState("");
-  const [briefFor, setBriefFor] = useState(""); // the question the improved version was written from
+  const [briefFor, setBriefFor] = useState("");
+  const [notice, setNotice] = useState(""); // a quiet note about this run, kept until the next one // the question the improved version was written from
   const [briefing, setBriefing] = useState(false);
   const [rounds, setRounds] = useState<Round[]>([]);   // earlier rounds of this idea, oldest first
   const [revising, setRevising] = useState(false);     // the Revise conversation is open
@@ -210,7 +211,7 @@ export default function Home() {
       setBrief(d.brief); setBriefFor(idea); setBriefOpen(false);
       return d.brief;
     } catch (e: any) {
-      setErr(`Couldn't improve the question (${e.message}), so it was sent as written.`);
+      setNotice(`Couldn't improve the question (${e.message}), so it was asked as written.`);
       return null;
     } finally { setBriefing(false); }
   }
@@ -262,6 +263,7 @@ export default function Home() {
     const targets = selected.filter((s) => byId[s]?.configured);
     // Cmd+Enter lands here too, so guard against a second run while one is in flight.
     if (!(useThis ?? idea).trim() || !targets.length || running || briefing) return;
+    setErr(""); setNotice("");
     // Use the improved question if it's still for this idea; otherwise improve it now.
     let prompt = (useThis ?? (brief && briefFor === idea ? brief : "")).trim();
     if (!prompt) {
@@ -272,7 +274,7 @@ export default function Home() {
     // Sending again keeps what came back last time as an earlier round.
     if (done.length) setRounds((all) => [...all, { n: all.length + 1, brief: runPrompt, mode, results: done, verdict }]);
     setRevising(false);
-    setErr(""); setVerdict(""); setBriefOpen(false); setShowAnswers(false);
+    setVerdict(""); setBriefOpen(false); setShowAnswers(false);
     const id = uid(); setRunId(id); setRunPrompt(prompt); activeRun.current = id;
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
@@ -487,6 +489,7 @@ export default function Home() {
       )}
 
       {err && <div className="error" role="alert">{err}</div>}
+      {notice && !briefing && !running && <p className="hint" role="status">{notice}</p>}
       <div className="sr" role="status" aria-live="polite">{announce}</div>
 
       <div ref={resultsRef} className="anchor" />
