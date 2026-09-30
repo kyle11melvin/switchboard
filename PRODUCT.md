@@ -31,7 +31,7 @@ The judge is the gatekeeper step Kyle otherwise does by hand. It grades answers 
 ## Operating Context
 
 - **Task-type presets** set default routing and add a task instruction: Creative image, Copy & marketing, Code & build, Research, Loan scenario, Gut check (all). Any model can be toggled after picking a preset.
-- **Keyword prediction** picks a preset as he types, until he picks one by hand.
+- **Picking on Send**: when he taps Ask, an AI reads the whole question and picks the preset and the AIs, before the question is improved. Nothing is guessed while typing. A preset or AI tapped by hand wins. Keyword matching is only the fallback.
 - **Projects and locked decisions**: each project holds a list of settled facts, one per line, that rides along with every prompt and with the judge.
 - **Image mode**: ChatGPT and Grok draw side by side. Models that cannot draw write a ready-to-paste image prompt instead. Image style templates: Auto, Poster / flyer, Product shot, Lifestyle photo, Illustration, UI mockup, Social.
 - **History**: the last 200 runs, text only (images are not stored).

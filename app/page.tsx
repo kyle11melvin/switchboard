@@ -105,7 +105,10 @@ export default function Home() {
   const [autoJudge, setAutoJudge] = useState(true);
   const [imgStyle, setImgStyle] = useState("auto");
   const [presetLocked, setPresetLocked] = useState(false); // true once the person picks a preset by hand
-  const [predicted, setPredicted] = useState<string | null>(null);
+  const [modelsLocked, setModelsLocked] = useState(false); // true once the person taps an AI by hand
+  // What was picked on Send, and for which question. Until then nothing is shown as chosen.
+  const [routed, setRouted] = useState<{ idea: string; why: string; guessed?: boolean } | null>(null);
+  const [picking2, setPicking2] = useState(false); // working out the job and the AIs
   const [judgeWith, setJudgeWith] = useState<ProviderId>("anthropic");
 
   const [brief, setBrief] = useState("");
@@ -165,6 +168,9 @@ export default function Home() {
   const noteFor = [preset.mode === mode ? preset.note : undefined, styleNote].filter(Boolean).join("\n\n") || undefined;
   const byId = useMemo(() => Object.fromEntries(providers.map((p) => [p.id, p])), [providers]);
   const label = (id: ProviderId) => byId[id]?.label ?? id;
+  // Chips show a choice only once there is one: picked by hand, or picked on Send for this question.
+  const showChoice = presetLocked || modelsLocked || routed?.idea === idea;
+  const noteOf = (p: Preset, m: Mode) => [p.mode === m ? p.note : undefined, m === "image" ? IMAGE_STYLES.find((x) => x.id === imgStyle)?.note : undefined].filter(Boolean).join("\n\n") || undefined;
 
   function applyPreset(p: Preset) {
     // A brief is written for words or for a picture, never both. Switching kind makes the old one wrong.
@@ -172,7 +178,7 @@ export default function Home() {
     setPreset(p); setMode(p.mode); setSelected(p.models); setAutoJudge(p.judge);
   }
   function pickPreset(p: Preset) { setPresetLocked(true); applyPreset(p); }
-  useEffect(() => { if (!idea.trim()) setPresetLocked(false); }, [idea]);
+  useEffect(() => { if (!idea.trim()) { setPresetLocked(false); setModelsLocked(false); } }, [idea]);
   useEffect(() => {
     if (!picking) return;
     const away = (e: Event) => { if (!(e.target as Element)?.closest?.(".projwrap")) setPicking(false); };
@@ -180,17 +186,36 @@ export default function Home() {
     document.addEventListener("pointerdown", away); document.addEventListener("keydown", key);
     return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", key); };
   }, [picking]);
-  function onIdeaChange(v: string, withPhotos = photos.length > 0) {
-    setIdea(v);
-    const id = predictPreset(v, { photos: withPhotos });
-    setPredicted(id);
-    if (!presetLocked && id && id !== preset.id) {
-      const p = PRESETS.find((x) => x.id === id);
-      if (p) applyPreset(p);
-    }
-  }
+  // Nothing is guessed while typing. The job and the AIs are picked on Send, from the whole question.
+  function onIdeaChange(v: string) { setIdea(v); }
   function toggle(id: ProviderId) {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+    // Before anything is picked, the first tap starts the list with that one AI.
+    setSelected((s) => (!showChoice ? [id] : s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+    setModelsLocked(true);
+  }
+
+  // Work out the kind of job and the AIs, unless the person already chose them by hand.
+  // Falls back to the keyword guess if the AI can't be reached.
+  async function route(): Promise<{ preset: Preset; models: ProviderId[] }> {
+    const keep = { preset, models: selected };
+    if (presetLocked) return keep;
+    setPicking2(true);
+    try {
+      const d = await api<{ job?: string; ais?: ProviderId[]; why?: string; error?: string }>("/api/pick", { idea, brain, photos: photos.length });
+      if (d.error) throw new Error(d.error);
+      const p = PRESETS.find((x) => x.id === d.job);
+      if (!p) throw new Error("no job came back");
+      const models = modelsLocked ? selected : d.ais?.length ? d.ais : p.models;
+      if (p.mode !== mode) setBrief("");
+      setPreset(p); setMode(p.mode); setSelected(models); setRouted({ idea, why: d.why ?? "" });
+      return { preset: p, models };
+    } catch (e: any) {
+      const p = PRESETS.find((x) => x.id === predictPreset(idea, { photos: photos.length > 0 })) ?? preset;
+      const models = modelsLocked ? selected : p.models;
+      setPreset(p); setMode(p.mode); setSelected(models);
+      setRouted({ idea, why: `Couldn't pick automatically (${e.message}), so it guessed from the words.`, guessed: true });
+      return { preset: p, models };
+    } finally { setPicking2(false); }
   }
   function updateProjects(next: Project[]) { setProjects(next); if (!save(LS.projects, next)) setErr(STORAGE_FULL); sync.syncSoon(); }
   function createProject(e: React.FormEvent) {
@@ -205,11 +230,11 @@ export default function Home() {
 
   // Every question is improved before it goes out: people don't know what to ask for, and that's the point.
   // Returns the improved question, or null when improving failed (the original is then used as-is).
-  async function sharpen(): Promise<string | null> {
+  async function sharpen(m: Mode = mode, note = noteFor): Promise<string | null> {
     if (!idea.trim()) return null;
     setErr(""); setBriefing(true);
     try {
-      const d = await api<{ brief?: string; error?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain, photos });
+      const d = await api<{ brief?: string; error?: string }>("/api/brief", { idea, mode: m, project: projectCtx, presetNote: note, brain, photos });
       if (d.error) throw new Error(d.error);
       if (!d.brief) throw new Error("came back empty");
       setBrief(d.brief); setBriefFor(idea); setBriefOpen(false);
@@ -237,10 +262,10 @@ export default function Home() {
     } catch (e: any) { if (activeRun.current === id) setErr(`Couldn't get the top answer: ${e.message} Tap "Get the top answer" to try again.`); } finally { setJudging(false); }
   }
 
-  async function runOne(provider: ProviderId, prompt: string, id: string): Promise<RunResult> {
+  async function runOne(provider: ProviderId, prompt: string, id: string, m: Mode = mode, note = noteFor): Promise<RunResult> {
     let res: RunResult;
     try {
-      const d = await api<Partial<RunResult>>("/api/run", { provider, mode, prompt, project: projectCtx, presetNote: noteFor, photos });
+      const d = await api<Partial<RunResult>>("/api/run", { provider, mode: m, prompt, project: projectCtx, presetNote: note, photos });
       res = { model: "", ms: 0, ...d, provider };
       if (!res.error && !res.text && !res.images?.length) res.error = "Came back empty. Try again.";
     } catch (e: any) {
@@ -266,24 +291,32 @@ export default function Home() {
   // Clear the screen for a fresh question. Projects and history stay.
   function startOver() {
     activeRun.current = null; setRunId(null); setRunPrompt(""); setAskedIdea(""); setErr(""); setNotice(""); setPhotos([]); setRounds([]); setRevising(false);
-    setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false);
+    setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); setModelsLocked(false); setRouted(null);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
     setTimeout(() => document.getElementById("idea")?.focus({ preventScroll: true }), 50);
   }
   async function send(useThis?: string) {
-    const targets = selected.filter((s) => byId[s]?.configured);
     // Cmd+Enter lands here too, so guard against a second run while one is in flight.
-    if (!(useThis ?? idea).trim() || !targets.length || running || briefing) return;
+    if (!(useThis ?? idea).trim() || running || briefing || picking2) return;
+    if (!providers.some((p) => p.configured)) return;
+    const lastMode = mode, lastDone = done, lastVerdict = verdict;
     setErr(""); setNotice("");
-    // Use the improved question if it's still for this idea; otherwise improve it now.
-    let prompt = (useThis ?? (brief && briefFor === idea ? brief : "")).trim();
+    // First: what kind of job is this and who should answer it. Done once per question.
+    let plan = { preset, models: selected };
+    if (!useThis && !showChoice) { setResults({}); setVerdict(""); plan = await route(); }
+    const m = plan.preset.mode;
+    const note = noteOf(plan.preset, m);
+    const targets = plan.models.filter((s) => byId[s]?.configured);
+    if (!targets.length) { setErr("None of the chosen AIs are set up. Tap one that is, then ask again."); return; }
+    // Use the improved question if it's still for this idea and this kind of job; otherwise improve it now.
+    let prompt = (useThis ?? (brief && briefFor === idea && m === lastMode ? brief : "")).trim();
     if (!prompt) {
       setResults({}); setVerdict("");
-      prompt = ((await sharpen()) ?? idea).trim();
+      prompt = ((await sharpen(m, note)) ?? idea).trim();
       if (!prompt) return;
     }
     // Sending again keeps what came back last time as an earlier round.
-    if (done.length) setRounds((all) => [...all, { n: all.length + 1, brief: runPrompt, mode, results: done, verdict }]);
+    if (lastDone.length) setRounds((all) => [...all, { n: all.length + 1, brief: runPrompt, mode: lastMode, results: lastDone, verdict: lastVerdict }]);
     setRevising(false);
     setVerdict(""); setBriefOpen(false); setShowAnswers(false);
     const id = uid(); setRunId(id); setRunPrompt(prompt); setAskedIdea(idea); activeRun.current = id;
@@ -291,18 +324,18 @@ export default function Home() {
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
     setTimeout(() => window.scrollTo({ top: 0, behavior: scrollBehavior() }), 50);
 
-    const finished = await Promise.all(targets.map((provider) => runOne(provider, prompt, id)));
+    const finished = await Promise.all(targets.map((provider) => runOne(provider, prompt, id, m, note)));
 
     const now = Date.now();
     const item: HistoryItem = {
-      id, at: now, updatedAt: now, idea, brief: prompt, mode, projectName: projectCtx?.name,
+      id, at: now, updatedAt: now, idea, brief: prompt, mode: m, projectName: projectCtx?.name,
       // Images are big; keep history light by storing text only.
       results: finished.map((r) => ({ ...r, images: undefined })),
     };
     setHistory((h) => saveHistory([item, ...h].slice(0, HISTORY_LIMIT)));
     sync.syncSoon();
 
-    if (activeRun.current === id && mode === "text" && autoJudge && finished.filter((r) => r.text && !r.error).length >= 2) {
+    if (activeRun.current === id && m === "text" && autoJudge && finished.filter((r) => r.text && !r.error).length >= 2) {
       judge(finished, prompt, id);
     }
   }
@@ -312,7 +345,7 @@ export default function Home() {
     // Keep the task chip in step with the kind of run, or its instructions would leak into the wrong kind.
     if (h.mode === "image" && preset.mode !== "image") { const p = PRESETS.find((x) => x.mode === "image"); if (p) { setPreset(p); setSelected(p.models); setAutoJudge(p.judge); } }
     if (h.mode === "text" && preset.mode !== "text") { const p = PRESETS.find((x) => x.id === (predictPreset(h.idea) ?? "copy")) ?? PRESETS.find((x) => x.mode === "text"); if (p) { setPreset(p); setSelected(p.models); setAutoJudge(p.judge); } }
-    setPresetLocked(true);
+    setPresetLocked(true); setModelsLocked(true); setSelected(h.results.map((r) => r.provider));
     setResults(Object.fromEntries(h.results.map((r) => [r.provider, r])));
     setVerdict(h.verdict ?? ""); setRunId(h.id); setRunPrompt(h.brief); setAskedIdea(h.idea); activeRun.current = h.id; setErr(""); setShowHistory(false); setBriefOpen(false); setShowAnswers(false); setRounds([]); setRevising(false);
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
@@ -327,8 +360,11 @@ export default function Home() {
   // Results are in and the question hasn't been edited since: the next move is New ask, not asking the same thing again.
   const finished = done.length > 0 && !running && !judging && !briefing && idea.trim() === askedIdea.trim();
   // One line that always says what to do next. Assumes nothing.
-  const askLabel = sendable.length > 2 ? `Ask ${sendable.length} AIs` : sendable.length ? `Ask ${sendable.map(label).join(" + ")}` : "";
-  const nextStep = !sendable.length ? "Pick at least one AI above."
+  const anyAI = providers.some((p) => p.configured);
+  const askLabel = !showChoice ? "Ask" : sendable.length > 2 ? `Ask ${sendable.length} AIs` : sendable.length ? `Ask ${sendable.map(label).join(" + ")}` : "";
+  const nextStep = !anyAI ? "No AIs are set up yet."
+    : showChoice && !sendable.length ? "Pick at least one AI above."
+    : picking2 ? "Working out what kind of job this is and who should answer."
     : running ? (mode === "image" ? "Drawing. Pictures take about half a minute." : "Asking. Answers take up to a minute.")
     : judging ? "Working out the top answer. About a minute."
     : done.length && failedCount === done.length ? (done.length > 1 ? "None of them answered. Tap Try again on each, or ask again." : "It didn't answer. Tap Try again.")
@@ -338,6 +374,7 @@ export default function Home() {
     : done.length && canJudge ? "Answers are in. Tap Get the top answer."
     : done.length ? "Done. Change something to adjust it, or New ask to move on."
     : briefing ? "Improving your question first."
+    : idea.trim() && !showChoice ? `Tap Ask. It picks the AIs, improves your question, then asks.${photos.length ? " Your photos go along." : ""}`
     : idea.trim() ? `Tap ${askLabel}. It improves your question first, then asks.${photos.length ? " Your photos go along." : ""}`
     : "Type what you need in the box above.";
 
@@ -431,8 +468,8 @@ export default function Home() {
       )}
 
       {/* Idea. Folds away while the AIs work, so the working screen is what you see. */}
-      <section className="panel idea" hidden={briefing || running || judging}>
-        <div className="row"><label className="lbl" htmlFor="idea">Ask anything</label><span className="modepill">{mode === "image" ? "Picture" : "Words"}</span></div>
+      <section className="panel idea" hidden={picking2 || briefing || running || judging}>
+        <div className="row"><label className="lbl" htmlFor="idea">Ask anything</label><span className="modepill">{!showChoice ? "Auto" : mode === "image" ? "Picture" : "Words"}</span></div>
         <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } }}
           placeholder="Type your question or what you want made. Rough is fine." />
         <div className="photorow">
@@ -454,21 +491,21 @@ export default function Home() {
             setPhotoNote("");
             const added = (await Promise.all(files.map((f) => shrinkFile(f)))).filter((x): x is string => !!x);
             if (added.length < files.length) setPhotoNote("One of those files couldn't be read as a photo.");
-            if (added.length) { setPhotos((all) => [...all, ...added].slice(0, 5)); onIdeaChange(idea, true); }
+            if (added.length) setPhotos((all) => [...all, ...added].slice(0, 5));
           }} />
           {photoNote && <span className="muted">{photoNote}</span>}
         </div>
 
         <div className="chips" role="group" aria-label="What kind of help">
           {PRESETS.map((p) => (
-            <button key={p.id} aria-pressed={preset.id === p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}><PresetIcon id={p.id} />{p.label}{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
+            <button key={p.id} aria-pressed={showChoice && preset.id === p.id} className={`chip ${showChoice && preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}><PresetIcon id={p.id} />{p.label}{!presetLocked && routed?.idea === idea && preset.id === p.id && <small className="auto"> · auto</small>}</button>
           ))}
         </div>
 
-        {mode === "image" && !selected.some((s) => byId[s]?.configured && byId[s]?.canImage) && (
+        {showChoice && mode === "image" && !selected.some((s) => byId[s]?.configured && byId[s]?.canImage) && (
           <p className="hint">None of the selected AIs can draw. They'll write you a ready-to-paste picture prompt instead.</p>
         )}
-        {mode === "image" && (
+        {showChoice && mode === "image" && (
           <div className="chips styles" role="group" aria-label="Kind of picture">
             {IMAGE_STYLES.map((st) => (
               <button key={st.id} aria-pressed={imgStyle === st.id} className={`chip sm ${imgStyle === st.id ? "on" : ""}`} onClick={() => setImgStyle(st.id)}>{st.label}</button>
@@ -478,17 +515,23 @@ export default function Home() {
         <div className="chips models" role="group" aria-label="Which AIs answer">
           {providers.map((p) => {
             const disabled = !p.configured;
-            const why = !p.configured ? "not set up" : mode === "image" && !p.canImage ? "writes the prompt only" : "";
+            const why = !p.configured ? "not set up" : showChoice && mode === "image" && !p.canImage ? "writes the prompt only" : "";
             return (
-              <button key={p.id} disabled={disabled} aria-pressed={selected.includes(p.id) && !disabled}
-                className={`chip model ${p.id} ${selected.includes(p.id) && !disabled ? "on" : ""}`}
+              <button key={p.id} disabled={disabled} aria-pressed={showChoice && selected.includes(p.id) && !disabled}
+                className={`chip model ${p.id} ${showChoice && selected.includes(p.id) && !disabled ? "on" : ""}`}
                 onClick={() => toggle(p.id)} title={p.model}>
                 <Logo id={p.id} />{p.label}{why && <small> · {why}</small>}
               </button>
             );
           })}
         </div>
-        {mode === "text" && (
+        {!showChoice && providers.some((p) => p.configured) && (
+          <p className="hint">When you ask, it picks the kind of job and the AIs that suit it. Or tap chips to choose yourself.</p>
+        )}
+        {showChoice && !presetLocked && routed?.idea === idea && routed.why && (
+          <p className="hint" role="status">{routed.guessed ? "" : "Picked for you: "}{routed.why} Tap a chip to change it.</p>
+        )}
+        {(mode === "text" || !showChoice) && providers.some((p) => p.configured) && (
           <div className="row judgeRow">
             <label className="switch"><input type="checkbox" checked={autoJudge} onChange={(e) => setAutoJudge(e.target.checked)} /><span className="track"><span className="knob" /></span> Get the top answer</label>
             <select className="inline" aria-label="Which AI picks the top answer" value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
@@ -527,12 +570,15 @@ export default function Home() {
 
       <div ref={resultsRef} className="anchor" />
 
-      {(briefing || running || judging) && (
+      {(picking2 || briefing || running || judging) && (
         <section className="panel working" aria-live="polite">
           <Mark size={96} />
-          <h2>{briefing ? "Improving your question…" : running ? `Asking ${Object.keys(results).length} AI${Object.keys(results).length === 1 ? "" : "s"}…` : "Working out the top answer…"}</h2>
-          <p className="muted">{briefing ? "Turning what you typed into a question the AIs will answer well." : running ? "Each one answers on its own. Then one of them picks the best of all of them." : `${label(judgeWith)} is reading every answer and writing the top one.`}</p>
-          {!briefing && <ul className="progress">
+          <h2>{picking2 ? "Working out who should answer…" : briefing ? "Improving your question…" : running ? `Asking ${Object.keys(results).length} AI${Object.keys(results).length === 1 ? "" : "s"}…` : "Working out the top answer…"}</h2>
+          {!picking2 && routed?.idea === idea && !presetLocked && (
+            <p className="muted"><strong>{preset.label} · {selected.filter((s) => byId[s]?.configured).map(label).join(" + ")}</strong>{routed.why ? `. ${routed.why}` : ""}</p>
+          )}
+          <p className="muted">{picking2 ? "Reading what you asked to pick the kind of job and the AIs that suit it." : briefing ? "Turning what you typed into a question the AIs will answer well." : running ? "Each one answers on its own. Then one of them picks the best of all of them." : `${label(judgeWith)} is reading every answer and writing the top one.`}</p>
+          {!briefing && !picking2 && <ul className="progress">
             {Object.entries(results).map(([pid, r]) => (
               <li key={pid} className={r === "loading" ? "wait" : r.error ? "bad" : "done"}>
                 <Logo id={pid as ProviderId} /><span>{label(pid as ProviderId)}</span>
@@ -541,7 +587,7 @@ export default function Home() {
               </li>
             ))}
           </ul>}
-          <p className="muted small">This usually takes about a minute.</p>
+          {!picking2 && <p className="muted small">This usually takes about a minute.</p>}
         </section>
       )}
 
@@ -658,7 +704,7 @@ export default function Home() {
       {Object.keys(results).length === 0 && !brief && (
         <section className="howto">
           <div><b>1</b><span>Type a question</span></div>
-          <div><b>2</b><span>Pick which AIs answer</span></div>
+          <div><b>2</b><span>It picks the right AIs</span></div>
           <div><b>3</b><span>Get the top answer</span></div>
         </section>
       )}
@@ -674,8 +720,8 @@ export default function Home() {
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>New ask
           </button>
         ) : (
-          <button className="primary" disabled={!idea.trim() || !sendable.length || running || briefing} onClick={() => send()}>
-            {briefing ? "Improving…" : running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? `${askLabel} →` : "Pick at least one AI"}
+          <button className="primary" disabled={!idea.trim() || !anyAI || (showChoice && !sendable.length) || running || briefing || picking2} onClick={() => send()}>
+            {picking2 ? "Picking…" : briefing ? "Improving…" : running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : !showChoice || sendable.length ? `${askLabel} →` : "Pick at least one AI"}
           </button>
         )}
         </div>

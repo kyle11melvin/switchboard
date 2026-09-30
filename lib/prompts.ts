@@ -137,3 +137,38 @@ export function reviseUserPrompt(input: {
   const chat = input.chat.map((m) => `${m.role === "you" ? "YOU ASKED" : "THEY SAID"}: ${m.text}`).join("\n");
   return `# ORIGINAL IDEA\n${input.idea}\n\n# BRIEF THAT WAS SENT (${input.mode === "image" ? "an image prompt" : "a text brief"})\n${input.brief}\n\n# WHAT CAME BACK\n${results}\n\n# CONVERSATION\n${chat}`;
 }
+
+// Picking the job and the AIs happens on Send, before the question is improved, because the improved
+// question is written differently for a picture than for words. The AI reads the whole request instead
+// of matching words, so "create" can mean a post, a web page or a picture depending on what follows it.
+export const STRENGTHS: Record<string, string> = {
+  openai: "strong all-rounder for writing and code; can draw pictures",
+  anthropic: "careful reasoning, code, nuanced long writing, following rules exactly; cannot draw",
+  xai: "punchy casual voice for social posts, current social trends; can draw pictures",
+  perplexity: "searches the live web and cites sources; best for facts that change; weak at creative writing; cannot draw",
+  gemini: "research, long documents, broad knowledge; cannot draw",
+};
+
+export const ROUTE_SYSTEM = `You decide where a request goes before it is sent. Read the whole request and what it is for, not single words: "create a landing page" is software, "create a post about it" is words, "create a picture of it" is a picture.
+
+Pick exactly one JOB from the list, then the AIs that should answer it, from AVAILABLE AIs only.
+- Start from the job's usual AIs and change them only when the request calls for it.
+- If the person names AIs ("ask Grok"), use exactly those.
+- For a picture, pick only AIs that can draw, unless none are available.
+- For anything else, pick 2 or 3 AIs so their answers can be compared; fewer only if fewer are available.
+
+Reply with ONLY one line of JSON, no code fence:
+{"job":"<job id>","ais":["<ai id>", ...],"why":"<under 12 words, plain, e.g. It's a social post, so the two social voices.>"}`;
+
+export function routePrompt(
+  idea: string,
+  jobs: { id: string; label: string; use: string; models: string[] }[],
+  ais: { id: string; label: string; canImage: boolean }[],
+  photos: number,
+) {
+  return [
+    `REQUEST:\n${idea}${photos ? `\n[${photos} photo${photos === 1 ? " is" : "s are"} attached. A photo plus a scene or "make/turn into" almost always means a picture.]` : ""}`,
+    `JOBS:\n${jobs.map((j) => `- ${j.id} (${j.label}): ${j.use} Usual AIs: ${j.models.join(", ")}`).join("\n")}`,
+    `AVAILABLE AIs:\n${ais.map((a) => `- ${a.id} (${a.label}): ${STRENGTHS[a.id] ?? ""}`).join("\n")}`,
+  ].join("\n\n");
+}

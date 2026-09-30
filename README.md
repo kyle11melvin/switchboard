@@ -5,7 +5,8 @@ One idea → sharpened brief → pick your AIs → side-by-side answers → one 
 ## What's in v1
 
 - **Improving the question** — every question is improved automatically before it's asked (goal, deliverable, constraints, done-criteria). You can open the improved version, edit it, and ask again.
-- **Presets** — routing defaults by task type (`lib/presets.ts`): Creative image → ChatGPT + Grok, Code → Claude + ChatGPT, Research → Perplexity + Claude + Gemini, Loan scenario, Ask everyone. Toggle any model on/off after picking a preset.
+- **Picking who answers** — nothing is guessed while you type. When you tap Ask, the brain model reads the whole question and picks the kind of job and the AIs that suit it (`app/api/pick`, `ROUTE_SYSTEM` in `lib/prompts.ts`), so "create a post" and "create a landing page" go to different places. Then the question is improved for that job and sent. Tap a task or an AI yourself before asking and your choice wins. If picking fails, it falls back to a keyword guess (`lib/predict.ts`).
+- **Presets** — the jobs it picks from, with their usual AIs and when each applies (`lib/presets.ts`): Creative image → ChatGPT + Grok, Code → Claude + ChatGPT, Research → Perplexity + Claude + Gemini, Loan scenario, Ask everyone.
 - **Projects** — per-project list of things every AI should always know, sent with every question *and* to the judge. Synced between your devices.
 - **Judge** — works in two steps, blind (answers are shuffled and labelled A/B/C; see `lib/blind.ts`). Step 1 grades every answer and lists the best parts of each. Step 2 writes one final answer from that list alone, without seeing the answers, so it can't copy one. Switchboard then counts how much of the final wording came from each answer (`lib/measure.ts`). You see the answer; the grading is folded away.
 - **Image mode** — ChatGPT and Grok generate images side by side; tap to download.

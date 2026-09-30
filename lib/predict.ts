@@ -1,5 +1,6 @@
-// Predict the task type from the idea text as the person types.
-// Cheap keyword scoring — no API call, runs on every keystroke.
+// Guess the task type from the words. Only a fallback now: on Send an AI reads the question and picks
+// the job and the AIs (app/api/pick). This runs when that call fails, and for runs opened from history.
+// Cheap keyword scoring, no API call.
 
 const RULES: { id: string; words: RegExp; weight?: number }[] = [
   { id: "image", words: /\b(image|picture|photo|logo|illustration|render|poster|banner|thumbnail|graphic|artwork|drawing|icon|wallpaper|visual|mockup|flyer design|generate an? (image|pic))\b/i, weight: 3 },
