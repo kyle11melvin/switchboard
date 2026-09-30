@@ -314,10 +314,11 @@ export default function Home() {
   return (
     <main>
       <header className="top">
-        <h1 className="brand">Switchboard<span>ask once · get the top answer</span></h1>
+        <h1 className="brand"><Mark size={44} /><span className="brandtext">Switchboard<span>ask once · get the top answer</span></span></h1>
         <div className="topright">
           <div className="projwrap">
-            <button className={`projpill ${project?.id !== "none" ? "has" : ""}`} aria-expanded={picking} aria-haspopup="menu" aria-controls="projects" onClick={() => { setPicking((v) => !v); setNaming(false); }}>
+            <button className={`projpill ${project?.id !== "none" ? "has" : "none"}`} aria-label={project?.id !== "none" ? `Project: ${project.name}` : "Project"} aria-expanded={picking} aria-haspopup="menu" aria-controls="projects" onClick={() => { setPicking((v) => !v); setNaming(false); }}>
+              <svg className="folder" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
               <span>{project?.id !== "none" ? project.name : "No project"}</span>
               <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
             </button>

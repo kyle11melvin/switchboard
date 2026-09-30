@@ -95,14 +95,19 @@ body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 
 
 /* Header */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0 18px; }
-.brand { min-width: 0; flex: 1; margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.625rem; letter-spacing: -0.02em; color: var(--accent2); line-height: 1.1; }
-.brand span { display: block; font-family: var(--body); font-size: 0.6875rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
+.brand { min-width: 0; flex: 1; margin: 0; display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 1.625rem; letter-spacing: -0.02em; color: var(--accent2); line-height: 1.1; }
+.brand .markimg { flex: none; filter: drop-shadow(0 4px 12px rgba(var(--accent-rgb), 0.35)); }
+.brandtext { display: block; min-width: 0; white-space: nowrap; }
+.brandtext span { white-space: normal; }
+.brandtext span { display: block; font-family: var(--body); font-size: 0.6875rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
 .topright { flex: none; display: flex; align-items: center; gap: 8px; }
 .projpill { display: inline-flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--field-line); border-radius: var(--pill); padding: 8px 12px; font-weight: 700; font-size: 0.8125rem; max-width: 170px; color: var(--muted); }
 .projpill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .projpill svg { flex: none; }
 .projpill.has { color: var(--text); border-color: var(--accent); }
 .projpill svg { color: var(--muted); }
+.projpill .folder { display: none; }
+@media (max-width: 480px) { .projpill.none .folder { display: block; } }
 .topright { position: relative; }
 .projmenu { position: absolute; right: 0; top: calc(100% + 8px); text-align: left; z-index: 30; width: min(300px, calc(100vw - 32px)); padding: 6px; background: var(--panel); border: 1px solid var(--line2); border-radius: var(--r); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45); animation: open 160ms var(--ease-out) backwards; }
 .projmenu button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-radius: 10px; padding: 11px 12px; font-weight: 700; font-size: 0.9375rem; color: var(--text); }
@@ -356,7 +361,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .login .panel { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
 .login input { background: var(--bg2); border: 1px solid var(--field-line); border-radius: var(--r-sm); padding: 13px 14px; font-size: max(16px, 1rem); }
 .login .error { margin: 0; }
-.login .brand { margin-bottom: 6px; }
+.login .brand { margin-bottom: 6px; justify-content: center; text-align: center; }
 .login .mark { display: flex; justify-content: center; margin: 4px 0 8px; filter: drop-shadow(0 10px 28px rgba(var(--accent-rgb), 0.25)); }
 
 /* Focus: fields get an inset copper ring, everything else an offset one */
@@ -396,8 +401,11 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
   .md, .best { font-size: 1rem; } /* reading text on phones */
 }
 @media (max-width: 480px) {
-  .brand { font-size: 1.5rem; }
-  .brand span { font-size: 0.5625rem; letter-spacing: 0.08em; white-space: nowrap; }
+  .brand { font-size: 1.375rem; gap: 8px; }
+  .brand .markimg { width: 40px; height: 40px; }
+  .brandtext span { font-size: 0.5625rem; letter-spacing: 0.06em; }
+  .projpill.none span { display: none; } /* just the folder and chevron until a project is picked */
+  .projpill.none { padding: 0; width: 40px; height: 40px; justify-content: center; }
   .projpill { max-width: 118px; padding: 7px 10px; font-size: 0.75rem; }
   .iconbtn { width: 36px; height: 36px; }
   .howto div { font-size: 0.75rem; padding: 10px; }
@@ -405,7 +413,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
   .md th, .md td { padding: 6px 7px; }
 }
 @media (max-width: 350px) {
-  .brand { font-size: 1.1875rem; }
+  .brand { font-size: 1.0625rem; gap: 6px; }
+  .brand .markimg { width: 34px; height: 34px; }
   .topright { gap: 6px; }
   .projpill { max-width: 92px; padding-left: 8px; padding-right: 8px; }
   .actionrow { gap: 8px; }
