@@ -53,7 +53,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "all",
-    label: "Gut check (all)",
+    label: "Ask everyone",
     mode: "text",
     models: ["openai", "anthropic", "xai", "perplexity", "gemini"],
     judge: true,

@@ -23,7 +23,7 @@ export default function Login() {
   return (
     <main className="login">
       <form onSubmit={go} className="panel">
-        <h1 className="brand">Switchboard<span>one idea · every AI · one verdict</span></h1>
+        <h1 className="brand">Switchboard<span>ask once · several AIs answer · one best answer</span></h1>
         <label className="sr" htmlFor="pw">Password</label>
         <input id="pw" type="password" aria-invalid={!!err} aria-describedby={err ? "pwerr" : undefined} autoFocus placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
         {err && <div id="pwerr" className="error" role="alert">{err}</div>}

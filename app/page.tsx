@@ -195,9 +195,9 @@ export default function Home() {
     try {
       const d = await api<{ brief?: string; error?: string }>("/api/brief", { idea, mode, project: projectCtx, presetNote: noteFor, brain });
       if (d.error) throw new Error(d.error);
-      if (!d.brief) throw new Error("The brief came back empty. Try again.");
+      if (!d.brief) throw new Error("The improved question came back empty. Try again.");
       setBrief(d.brief); setBriefOpen(true);
-    } catch (e: any) { setErr(`Sharpen failed: ${e.message}`); } finally { setBriefing(false); }
+    } catch (e: any) { setErr(`Couldn't improve the question: ${e.message}`); } finally { setBriefing(false); }
   }
 
   async function judge(finalResults: RunResult[], promptUsed: string, id: string) {
@@ -213,8 +213,8 @@ export default function Home() {
       setHistory((h) => saveHistory(h.map((x) => (x.id === id ? { ...x, verdict: v, updatedAt: Date.now() } : x))));
       sync.syncSoon();
       if (activeRun.current !== id) return;
-      setVerdict(v); setAnnounce("Verdict ready.");
-    } catch (e: any) { if (activeRun.current === id) setErr(`Judge failed: ${e.message} Tap "Judge these answers" to try again.`); } finally { setJudging(false); }
+      setVerdict(v); setAnnounce("Best answer ready.");
+    } catch (e: any) { if (activeRun.current === id) setErr(`Couldn't combine the answers: ${e.message} Tap "Combine these answers" to try again.`); } finally { setJudging(false); }
   }
 
   async function runOne(provider: ProviderId, prompt: string, id: string): Promise<RunResult> {
@@ -294,14 +294,14 @@ export default function Home() {
   return (
     <main>
       <header className="top">
-        <h1 className="brand">Switchboard<span>one idea · every AI · one verdict</span></h1>
+        <h1 className="brand">Switchboard<span>ask once · several AIs answer · one best answer</span></h1>
         <div className="topright">
           <select className="projpill" aria-label="Project" value={projectId} onChange={(e) => { const v = e.target.value; if (v === "__new") { setNaming(true); } else { setNaming(false); chooseProject(v); setEditingProject(false); } }}>
             {shownProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             <option value="__new">+ New project…</option>
           </select>
           {Object.keys(results).length > 0 && (
-            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setRounds([]); setRevising(false); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
+            <button className="iconbtn" aria-label="Start over" title="Start over" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setRounds([]); setRevising(false); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           )}
@@ -315,15 +315,15 @@ export default function Home() {
       {showHistory && (
         <section className="panel" aria-label="History">
           <SyncLine status={sync.status} onRetry={sync.syncNow} />
-          {history.length === 0 && <p className="muted">No runs yet.</p>}
+          {history.length === 0 && <p className="muted">Nothing asked yet.</p>}
           {(showAllHistory ? history : history.slice(0, HISTORY_PAGE)).map((h) => (
             <button key={h.id} className="hist" onClick={() => openHistory(h)}>
-              <span>{h.idea.trim().slice(0, 90) || h.brief.trim().slice(0, 90) || "Untitled run"}</span>
+              <span>{h.idea.trim().slice(0, 90) || h.brief.trim().slice(0, 90) || "Untitled question"}</span>
               <small>{new Date(h.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · {h.results.map((r) => label(r.provider)).join(", ")}{h.verdict ? " · judged" : ""}{h.projectName ? ` · ${h.projectName}` : ""}</small>
             </button>
           ))}
           {history.length > HISTORY_PAGE && !showAllHistory && (
-            <button className="ghost small showall" onClick={() => setShowAllHistory(true)}>Show all {history.length} runs</button>
+            <button className="ghost small showall" onClick={() => setShowAllHistory(true)}>Show all {history.length}</button>
           )}
           {history.length > 0 && (
             <ConfirmButton label="Clear history" question={sync.status.state === "off" ? "Clear all history?" : "Clear all history on every device?"} yes="Clear" no="Keep" onYes={() => { sync.markCleared(); setHistory([]); save(LS.history, []); historyCache.partial = false; setShowAllHistory(false); }} />
@@ -347,15 +347,15 @@ export default function Home() {
         <section className="lockbar">
           <button className="lockline" aria-expanded={editingProject} onClick={() => setEditingProject((v) => !v)}>
             <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-            <span>{project.locked.trim() ? (() => { const c = project.locked.split("\n").filter((l) => l.trim()).length; return `${c} locked decision${c === 1 ? " rides" : "s ride"} along with every prompt`; })() : "No locked decisions yet — tap to add"}</span>
+            <span>{project.locked.trim() ? (() => { const c = project.locked.split("\n").filter((l) => l.trim()).length; return `${c} thing${c === 1 ? "" : "s"} it always knows about this project`; })() : "Tell it what it should always know about this project"}</span>
             <span className="chev">{editingProject ? "Done" : "Edit"}</span>
           </button>
           {editingProject && (
             <div className="lockeditor">
-              <textarea rows={6} value={project.locked} aria-label={`Locked decisions for ${project.name}, one per line`}
-                placeholder={"One per line. Every model and the judge treat these as settled.\ne.g. Single-file HTML, no framework\ne.g. Brand colors navy #1B2A4A / gold #C9A84C"}
+              <textarea rows={6} value={project.locked} aria-label={`Things it should always know about ${project.name}, one per line`}
+                placeholder={"One per line. Every AI is told these are settled.\ne.g. Single-file HTML, no framework\ne.g. Brand colors navy #1B2A4A / gold #C9A84C"}
                 onChange={(e) => updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: e.target.value, updatedAt: Date.now() } : p)))} />
-              <ConfirmButton danger label="Delete project" question={`Delete “${project.name}” and its locked decisions?`} yes="Delete" no="Keep"
+              <ConfirmButton danger label="Delete project" question={`Delete “${project.name}” and what it knows about it?`} yes="Delete" no="Keep"
                 onYes={() => {
                   // Leave a marker instead of removing it, so your other devices delete it too.
                   updateProjects(projects.map((p) => (p.id === project.id ? { ...p, locked: "", deleted: true, updatedAt: Date.now() } : p)));
@@ -368,30 +368,30 @@ export default function Home() {
 
       {/* Idea */}
       <section className="panel idea">
-        <div className="row"><label className="lbl" htmlFor="idea">Idea</label><span className="modepill">{mode === "image" ? "Image" : "Text"}</span></div>
+        <div className="row"><label className="lbl" htmlFor="idea">Ask anything</label><span className="modepill">{mode === "image" ? "Picture" : "Words"}</span></div>
         <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } }}
-          placeholder="Dump the rough idea. Sharpen it into a brief, or send it straight out." />
+          placeholder="Type your question or what you want made. Rough is fine." />
 
-        <div className="chips" role="group" aria-label="Task type">
+        <div className="chips" role="group" aria-label="What kind of help">
           {PRESETS.map((p) => (
             <button key={p.id} aria-pressed={preset.id === p.id} className={`chip ${preset.id === p.id ? "on" : ""}`} onClick={() => pickPreset(p)}><PresetIcon id={p.id} />{p.label}{!presetLocked && predicted === p.id && preset.id === p.id && <small className="auto"> · auto</small>}</button>
           ))}
         </div>
 
         {mode === "image" && !selected.some((s) => byId[s]?.configured && byId[s]?.canImage) && (
-          <p className="hint">No image-capable key yet (ChatGPT or Grok). The models below will write you a ready-to-paste image prompt instead.</p>
+          <p className="hint">None of the selected AIs can draw. They'll write you a ready-to-paste picture prompt instead.</p>
         )}
         {mode === "image" && (
-          <div className="chips styles" role="group" aria-label="Image style">
+          <div className="chips styles" role="group" aria-label="Kind of picture">
             {IMAGE_STYLES.map((st) => (
               <button key={st.id} aria-pressed={imgStyle === st.id} className={`chip sm ${imgStyle === st.id ? "on" : ""}`} onClick={() => setImgStyle(st.id)}>{st.label}</button>
             ))}
           </div>
         )}
-        <div className="chips models" role="group" aria-label="AIs to send to">
+        <div className="chips models" role="group" aria-label="Which AIs answer">
           {providers.map((p) => {
             const disabled = !p.configured;
-            const why = !p.configured ? "no key" : mode === "image" && !p.canImage ? "prompt only" : "";
+            const why = !p.configured ? "not set up" : mode === "image" && !p.canImage ? "writes the prompt only" : "";
             return (
               <button key={p.id} disabled={disabled} aria-pressed={selected.includes(p.id) && !disabled}
                 className={`chip model ${p.id} ${selected.includes(p.id) && !disabled ? "on" : ""}`}
@@ -403,8 +403,8 @@ export default function Home() {
         </div>
         {mode === "text" && (
           <div className="row judgeRow">
-            <label className="switch"><input type="checkbox" checked={autoJudge} onChange={(e) => setAutoJudge(e.target.checked)} /><span className="track"><span className="knob" /></span> Auto-judge</label>
-            <select className="inline" aria-label="Judge model" value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
+            <label className="switch"><input type="checkbox" checked={autoJudge} onChange={(e) => setAutoJudge(e.target.checked)} /><span className="track"><span className="knob" /></span> Combine the answers</label>
+            <select className="inline" aria-label="Which AI combines them" value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
               {providers.filter((p) => p.configured).map((p) => <option key={p.id} value={p.id}>by {p.label}</option>)}
             </select>
           </div>
@@ -415,11 +415,11 @@ export default function Home() {
         <section className="panel briefpanel">
           <div className="row briefhead">
             <button className="brieftoggle" aria-expanded={briefOpen} aria-controls="brief" onClick={() => setBriefOpen((v) => !v)}>
-              <span className="lbl">{briefOpen ? (brief !== runPrompt && done.length ? `Brief for round ${rounds.length + 2} · this is what gets sent` : "Brief · this is what gets sent") : "Brief · tap to open"}</span>
+              <span className="lbl">{briefOpen ? (brief !== runPrompt && done.length ? `Your improved question for try ${rounds.length + 2} · this is what gets sent` : "Your improved question · this is what gets sent") : "Your improved question · tap to open"}</span>
             </button>
-            <button className="ghost small" onClick={() => setBrief("")}>Discard</button>
+            <button className="ghost small" onClick={() => setBrief("")}>Use my original instead</button>
           </div>
-          {briefOpen && <textarea id="brief" rows={10} aria-label="Brief" value={brief} onChange={(e) => setBrief(e.target.value)} />}
+          {briefOpen && <textarea id="brief" rows={10} aria-label="Your improved question" value={brief} onChange={(e) => setBrief(e.target.value)} />}
         </section>
       )}
 
@@ -429,7 +429,7 @@ export default function Home() {
           onClose={() => setRevising(false)}
           onBrief={(b) => {
             setBrief(b); setBriefOpen(true); setRevising(false);
-            setAnnounce("New brief ready. Edit it if you like, then send.");
+            setAnnounce("Your improved question is ready. Edit it if you like, then ask again.");
             setTimeout(() => document.querySelector(".briefpanel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60);
           }} />
       )}
@@ -443,7 +443,7 @@ export default function Home() {
       {(judging || verdict) && (
         <section className="panel verdict" aria-busy={judging}>
           <div className="row">
-            <h2 className="lbl">{judging ? "Writing the answer…" : `Answer · judged blind by ${label(judgeWith)}`}</h2>
+            <h2 className="lbl">{judging ? "Combining the answers…" : `Best answer · combined by ${label(judgeWith)}`}</h2>
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <Skeleton /> : (() => {
@@ -453,16 +453,16 @@ export default function Home() {
                 <div className="best md"><Markdown text={best} /></div>
                 {/* The answer is the point. How it was reached stays folded until asked for. */}
                 <details className="grading">
-                  <summary>{flags > 0 ? `${flags} red flag${flags === 1 ? "" : "s"} caught · ` : ""}How this was judged</summary>
+                  <summary>{flags > 0 ? `${flags} problem${flags === 1 ? "" : "s"} caught · ` : ""}Show how it got there</summary>
                   {measured && (
                     <div className="sources">
-                      <h3 className="lbl">Where the wording came from</h3>
+                      <h3 className="lbl">How much came from each AI</h3>
                       <div className="md"><Markdown text={measured} /></div>
                     </div>
                   )}
                   {sources && (
                     <div className="sources">
-                      <h3 className="lbl">What the judge says it used</h3>
+                      <h3 className="lbl">What it took from each AI</h3>
                       <div className="md"><Markdown text={sources} /></div>
                     </div>
                   )}
@@ -474,17 +474,17 @@ export default function Home() {
         </section>
       )}
       {canJudge && !verdict && (
-        <button className="primary wide" onClick={() => judge(done, (brief || idea).trim(), runId ?? uid())}>Judge these answers</button>
+        <button className="primary wide" onClick={() => judge(done, (brief || idea).trim(), runId ?? uid())}>Combine these answers</button>
       )}
 
       {/* Once there's a verdict, the individual answers step back behind one button. */}
       {Object.keys(results).length > 0 && verdict && !judging && (
         <button className="ghost wide answerstoggle" aria-expanded={showAnswers} onClick={() => setShowAnswers((v) => !v)}>
-          {showAnswers ? "Hide" : "Show"} the {done.length} individual answer{done.length === 1 ? "" : "s"}{failedCount > 0 ? ` (${failedCount} failed)` : ""}
+          {showAnswers ? "Hide" : "Show"} each AI's own answer{failedCount > 0 ? ` (${failedCount} failed)` : ""}
         </button>
       )}
 
-      {rounds.length > 0 && Object.keys(results).length > 0 && <h2 className="lbl roundnow">Round {rounds.length + 1}</h2>}
+      {rounds.length > 0 && Object.keys(results).length > 0 && <h2 className="lbl roundnow">Try {rounds.length + 1}</h2>}
       {Object.keys(results).length > 0 && (!verdict || judging || showAnswers) && (
         <section className={`grid n${Object.keys(results).length}`}>
           {Object.entries(results).map(([pid, r]) => (
@@ -507,7 +507,7 @@ export default function Home() {
                     {r.images?.map((src, i) => (
                       <ResultImage key={i} src={src} name={`switchboard-${pid}-${i + 1}`} alt={`Image ${i + 1} from ${label(pid as ProviderId)}`} />
                     ))}
-                    {!r.text && !r.images?.length && <p className="muted">Images aren't kept in history. Send it again to redraw.</p>}
+                    {!r.text && !r.images?.length && <p className="muted">Pictures aren't kept in history. Ask again to redraw.</p>}
                     {r.text && <div className="md"><Markdown text={r.text} /></div>}
                     {r.citations && r.citations.length > 0 && (
                       <ol className="cites">{r.citations.map((c, i) => <li key={i}><a href={c} target="_blank" rel="noreferrer">{c.replace(/^https?:\/\//, "").slice(0, 60)}</a></li>)}</ol>
@@ -521,11 +521,11 @@ export default function Home() {
 
       {rounds.length > 0 && (
         <section className="rounds" aria-label="Earlier rounds">
-          <h2 className="lbl">Earlier rounds</h2>
+          <h2 className="lbl">Earlier tries</h2>
           {[...rounds].reverse().map((r) => (
             <details key={r.n} className="round">
-              <summary>Round {r.n} · {r.results.map((x) => label(x.provider)).join(", ")}</summary>
-              <details className="roundbrief"><summary>The brief that was sent</summary><p>{r.brief}</p></details>
+              <summary>Try {r.n} · {r.results.map((x) => label(x.provider)).join(", ")}</summary>
+              <details className="roundbrief"><summary>What was asked</summary><p>{r.brief}</p></details>
               {r.verdict && <div className="best md"><Markdown text={bestAnswer(r.verdict)} /></div>}
               <div className={`grid n${r.results.length}`}>
                 {r.results.map((x) => (
@@ -551,22 +551,22 @@ export default function Home() {
 
       {Object.keys(results).length === 0 && !brief && (
         <section className="howto">
-          <div><b>1</b><span>Drop a rough idea</span></div>
-          <div><b>2</b><span>Sharpen it into a brief</span></div>
-          <div><b>3</b><span>Every AI answers, one judges</span></div>
+          <div><b>1</b><span>Type a question</span></div>
+          <div><b>2</b><span>Pick which AIs answer</span></div>
+          <div><b>3</b><span>Get one best answer</span></div>
         </section>
       )}
 
       <div className="actionbar">
         {done.length > 0 && !running ? (
-          <button className="ghost" aria-expanded={revising} onClick={() => { setRevising(true); setTimeout(() => document.querySelector(".revise")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Revise</button>
+          <button className="ghost" aria-expanded={revising} onClick={() => { setRevising(true); setTimeout(() => document.querySelector(".revise")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Change something</button>
         ) : (
           <button className="ghost" disabled={!idea.trim() || briefing} onClick={sharpen}>
-            {briefing ? "Sharpening…" : brief ? "Re-sharpen" : "Sharpen"}
+            {briefing ? "Improving…" : brief ? "Improve again" : "Improve it first"}
           </button>
         )}
         <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={send}>
-          {running ? `Running… ${done.length} of ${Object.keys(results).length} in` : sendable.length ? (sendable.length > 2 ? `Send to ${sendable.length} AIs` : `Send to ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
+          {running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? (sendable.length > 2 ? `Ask ${sendable.length} AIs` : `Ask ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
         </button>
       </div>
     </main>

@@ -75,9 +75,9 @@ export default function Revise(props: {
 
   const answered = chat.some((m) => m.role === "them");
   return (
-    <section className="panel revise" aria-label="Revise">
+    <section className="panel revise" aria-label="Change something">
       <div className="row">
-        <h2 className="lbl">Revise</h2>
+        <h2 className="lbl">Change something</h2>
         <button className="ghost small" onClick={props.onClose}>Close</button>
       </div>
       <div className="talk" role="log" aria-live="polite">
@@ -86,18 +86,18 @@ export default function Revise(props: {
             <span className="sr">{m.role === "you" ? "Switchboard asks: " : "You said: "}</span>{m.text}
           </p>
         ))}
-        {busy && <p className="asks thinking">{answered && chat[chat.length - 1].role === "them" ? "Reading the results and rewriting the brief…" : "Thinking…"}</p>}
+        {busy && <p className="asks thinking">{answered && chat[chat.length - 1].role === "them" ? "Reading the answers and rewriting your question…" : "Thinking…"}</p>}
         <div ref={end} />
       </div>
       {err && <div className="error" role="alert">{err}</div>}
       <label className="sr" htmlFor="revise-say">Your answer</label>
       <textarea id="revise-say" ref={box} rows={3} maxLength={4000} value={draft} disabled={busy}
-        placeholder="Say it in plain words. For example: keep Grok's layout, use ChatGPT's dark theme, fix the commas."
+        placeholder="Say it in plain words. For example: shorter, keep Grok's layout, fix the commas."
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); void say(); } }} />
       <div className="row reviseactions">
         <span className="muted">Tap the microphone on your keyboard to speak instead of type.</span>
-        <button className="primary small" disabled={!draft.trim() || busy} onClick={say}>{busy ? "Working…" : answered ? "Send answer" : "Rewrite the brief"}</button>
+        <button className="primary small" disabled={!draft.trim() || busy} onClick={say}>{busy ? "Working…" : answered ? "Send" : "Apply my changes"}</button>
       </div>
     </section>
   );

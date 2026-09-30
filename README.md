@@ -4,9 +4,9 @@ One idea → sharpened brief → pick your AIs → side-by-side answers → one 
 
 ## What's in v1
 
-- **Sharpen** — turns a rough idea into a tight brief (goal, deliverable, constraints, done-criteria). Edit it before sending.
-- **Presets** — routing defaults by task type (`lib/presets.ts`): Creative image → ChatGPT + Grok, Code → Claude + ChatGPT, Research → Perplexity + Claude + Gemini, Loan scenario, Gut check (all). Toggle any model on/off after picking a preset.
-- **Projects + locked decisions** — per-project list of settled facts that gets sent with every prompt *and* to the judge. Synced between your devices.
+- **Improve it first** — turns a rough question into a tight one (goal, deliverable, constraints, done-criteria). Edit it before asking.
+- **Presets** — routing defaults by task type (`lib/presets.ts`): Creative image → ChatGPT + Grok, Code → Claude + ChatGPT, Research → Perplexity + Claude + Gemini, Loan scenario, Ask everyone. Toggle any model on/off after picking a preset.
+- **Projects** — per-project list of things every AI should always know, sent with every question *and* to the judge. Synced between your devices.
 - **Judge** — works in two steps, blind (answers are shuffled and labelled A/B/C; see `lib/blind.ts`). Step 1 grades every answer and lists the best parts of each. Step 2 writes one final answer from that list alone, without seeing the answers, so it can't copy one. Switchboard then counts how much of the final wording came from each answer (`lib/measure.ts`). You see the answer; the grading is folded away.
 - **Image mode** — ChatGPT and Grok generate images side by side; tap to download.
 - **History** — last 200 runs, synced between your devices.
@@ -39,9 +39,9 @@ Model IDs drift. Override without touching code:
 
 If a card shows a `404`/`model not found` error, that's the model ID — set the override to a current one.
 
-## Revise
+## Change something
 
-After results come back, the Sharpen button becomes **Revise**. It asks what you want changed; you answer in plain words. It may ask one or two short follow-up questions, then rewrites the brief from your idea, the brief that was sent, what each AI returned (including pictures), and your feedback. The new brief opens for editing, and Send starts the next round. Earlier rounds stay on screen, folded, for comparing. The AI chips still decide who the next round goes to. Code: `app/Revise.tsx`, `app/api/revise`, `REVISE_SYSTEM` in `lib/prompts.ts`.
+After results come back, the Improve button becomes **Change something**. It asks what you want changed; you answer in plain words. It may ask one or two short follow-up questions, then rewrites the brief from your idea, the brief that was sent, what each AI returned (including pictures), and your feedback. The new brief opens for editing, and Send starts the next round. Earlier rounds stay on screen, folded, for comparing. The AI chips still decide who the next round goes to. Code: `app/Revise.tsx`, `app/api/revise`, `REVISE_SYSTEM` in `lib/prompts.ts`.
 
 ## Sync between devices
 
@@ -74,11 +74,11 @@ npm run dev                  # http://localhost:3000
 ```
 app/page.tsx          the whole screen
 app/Markdown.tsx      renders answers and verdicts (loaded separately, it's the heaviest code)
-app/api/brief         idea → brief
+app/api/brief         question → improved question
 app/api/run           one model, one answer (browser calls these in parallel)
 app/api/judge         grade all answers
 lib/providers.ts      every AI, plain fetch, no SDKs
-lib/prompts.ts        the sharpen / answer / judge instructions
+lib/prompts.ts        the improve / answer / judge / revise instructions
 lib/presets.ts        routing defaults — edit these
 middleware.ts         password gate
 ```
