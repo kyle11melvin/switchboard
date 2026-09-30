@@ -4,7 +4,7 @@ import { readPhotos } from "@/lib/photos";
 import { keepAlive } from "@/lib/stream";
 import { ANSWER_SYSTEM_BASE, contextBlock, type ProjectCtx } from "@/lib/prompts";
 
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 // One call per model — the browser fires these in parallel so each card fills as it lands.
 export async function POST(req: Request) {

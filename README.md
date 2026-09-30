@@ -36,7 +36,7 @@ Each provider bills per use. For personal volume, expect a few dollars a month p
 
 Model IDs drift. Override without touching code:
 
-`OPENAI_MODEL`, `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_SIZE`, `ANTHROPIC_MODEL`, `XAI_MODEL`, `XAI_IMAGE_MODEL`, `PERPLEXITY_MODEL`, `GEMINI_MODEL`, `BRAIN_PROVIDER` (which model does the sharpen + default judge; default `anthropic`).
+`OPENAI_MODEL`, `OPENAI_REASONING` (how long gpt-5 thinks: `low` by default, `medium` or `high` for harder questions), `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_SIZE`, `ANTHROPIC_MODEL`, `XAI_MODEL`, `XAI_IMAGE_MODEL`, `PERPLEXITY_MODEL`, `GEMINI_MODEL`, `BRAIN_PROVIDER` (which model does the sharpen + default judge; default `anthropic`).
 
 If a card shows a `404`/`model not found` error, that's the model ID — set the override to a current one.
 

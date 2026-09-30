@@ -68,7 +68,7 @@ function key(id: ProviderId): string {
   return k;
 }
 
-const TIMEOUT_MS = 100_000;
+const TIMEOUT_MS = 150_000;
 
 async function postJSON(url: string, headers: Record<string, string>, body: unknown) {
   // Stop before the platform kills the function, so the card gets a readable error instead of a blank timeout.
@@ -119,7 +119,11 @@ async function openAICompatible(url: string, apiKey: string, model: string, syst
         : prompt,
     },
   ];
-  const data = await postJSON(url, { authorization: `Bearer ${apiKey}` }, { model, messages });
+  const body: Record<string, unknown> = { model, messages };
+  // gpt-5 reasons before it answers; at the default effort a research question can run past two minutes.
+  // Answers here are meant to be short, so think briefly unless told otherwise.
+  if (/^(gpt-5|o\d)/.test(model) && url.includes("api.openai.com")) body.reasoning_effort = process.env.OPENAI_REASONING || "low";
+  const data = await postJSON(url, { authorization: `Bearer ${apiKey}` }, body);
   const text: string = data?.choices?.[0]?.message?.content ?? "";
   const citations: string[] =
     data?.citations ?? data?.search_results?.map((r: any) => r.url).filter(Boolean) ?? [];

@@ -386,6 +386,7 @@ export default function Home() {
     : done.length && !finished ? `Tap ${askLabel} to ask the new question.`
     : verdict ? "Done. Copy the answer. Change something to adjust it, or New ask to move on."
     : done.length && mode === "image" ? "Done. Save the one you like. Change something to adjust it, or New ask to move on."
+    : done.length && failedCount > 0 && mode === "text" && !verdict && !canJudge ? `${done.filter((r) => r.error).map((r) => label(r.provider)).join(" and ")} didn't answer. Tap Try again on it to get the top answer.`
     : done.length && canJudge ? "Answers are in. Tap Get the top answer."
     : done.length ? "Done. Change something to adjust it, or New ask to move on."
     : briefing ? "Improving your question first."
