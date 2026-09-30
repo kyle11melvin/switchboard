@@ -48,7 +48,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
   gemini: {
     label: "Gemini",
     keyEnv: "GEMINI_API_KEY",
-    textModel: () => process.env.GEMINI_MODEL || "gemini-2.5-pro",
+    textModel: () => process.env.GEMINI_MODEL || "gemini-3.8-flash",
   },
 };
 
