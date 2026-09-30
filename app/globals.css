@@ -102,11 +102,17 @@ body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 
 .projpill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .projpill svg { flex: none; }
 .projpill.has { color: var(--text); border-color: var(--accent); }
-.projpill.has svg { color: var(--accent2); }
-.projects { display: flex; flex-direction: column; gap: 10px; animation: open 200ms var(--ease-out) backwards; }
-.projwhy { margin: 0; max-width: 60ch; }
-.projlist { margin-top: 0; }
-.newchip { border-style: dashed; color: var(--accent2); }
+.projpill svg { color: var(--muted); }
+.topright { position: relative; }
+.projmenu { position: absolute; right: 0; top: calc(100% + 8px); text-align: left; z-index: 30; width: min(300px, calc(100vw - 32px)); padding: 6px; background: var(--panel); border: 1px solid var(--line2); border-radius: var(--r); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45); animation: open 160ms var(--ease-out) backwards; }
+.projmenu button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-radius: 10px; padding: 11px 12px; font-weight: 700; font-size: 0.9375rem; color: var(--text); }
+.projmenu button svg { flex: none; color: var(--muted); }
+.projmenu button.on { background: rgba(var(--accent-rgb), 0.14); color: var(--accent2); }
+.projmenu button.on svg { color: var(--accent2); }
+.projmenu button.new { color: var(--accent2); }
+.projmenu button.new svg { color: var(--accent2); }
+@media (hover: hover) { .projmenu button:hover { background: rgba(var(--white-rgb), 0.05); } }
+.projmenu p { margin: 4px 0 2px; padding: 8px 12px 6px; border-top: 1px solid var(--line); font-size: 0.75rem; color: var(--muted); }
 .iconbtn { position: relative; width: 40px; height: 40px; border-radius: var(--pill); border: 1px solid var(--field-line); background: var(--panel); color: var(--muted); display: grid; place-items: center; padding: 0; }
 .badge { position: absolute; top: -4px; right: -4px; background: var(--accent); color: var(--accent-ink); font-size: 0.625rem; font-weight: 800; border-radius: var(--pill); min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 4px; }
 
@@ -150,6 +156,26 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .newproject input { flex: 1 1 130px; min-width: 0; background: var(--bg2); border: 1px solid var(--field-line); border-radius: var(--r-sm); padding: 10px 12px; font-size: max(16px, 1rem); }
 .newproject .row { margin-top: 10px; }
 .newproject { animation: open 200ms var(--ease-out) backwards; }
+
+.improverow { justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.improverow .muted { margin: 0; font-size: 0.75rem; }
+
+/* Working: while the AIs answer and the top answer is picked */
+.working { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 22px 16px 18px; border-color: var(--accent); background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.1), rgba(var(--accent-rgb), 0.02)), var(--panel); }
+.working h2 { margin: 6px 0 0; font: 700 1.375rem/1.2 var(--display); letter-spacing: -0.01em; color: var(--text); }
+.working > .muted { margin: 0; max-width: 34ch; }
+.working .small { font-size: 0.75rem; margin-top: 6px; }
+.markimg { filter: drop-shadow(0 10px 24px rgba(var(--accent-rgb), 0.3)); }
+.progress { list-style: none; margin: 14px 0 0; padding: 12px 14px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r-sm); text-align: left; }
+.progress li { display: grid; grid-template-columns: 22px 1fr auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 6px; align-items: center; font-weight: 700; font-size: 0.9375rem; }
+.progress li small { color: var(--muted); font-weight: 600; font-size: 0.8125rem; }
+.progress li.done small { color: var(--accent2); }
+.progress li.bad small { color: var(--red); }
+.progress li i { grid-column: 1 / -1; display: block; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.progress li b { display: block; height: 100%; width: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transform-origin: left; }
+.progress li.wait b { width: 40%; animation: slide 1.4s ease-in-out infinite; }
+.progress li.bad b { background: var(--red); width: 100%; }
+@keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
 
 /* Chips: task types, image styles, AIs */
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
@@ -331,6 +357,7 @@ span.logo { display: inline-block; } /* holds the space while the logo loads */
 .login input { background: var(--bg2); border: 1px solid var(--field-line); border-radius: var(--r-sm); padding: 13px 14px; font-size: max(16px, 1rem); }
 .login .error { margin: 0; }
 .login .brand { margin-bottom: 6px; }
+.login .mark { display: flex; justify-content: center; margin: 4px 0 8px; filter: drop-shadow(0 10px 28px rgba(var(--accent-rgb), 0.25)); }
 
 /* Focus: fields get an inset copper ring, everything else an offset one */
 textarea:focus, select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
@@ -370,7 +397,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
 }
 @media (max-width: 480px) {
   .brand { font-size: 1.5rem; }
-  .brand span { display: none; }
+  .brand span { font-size: 0.5625rem; letter-spacing: 0.08em; white-space: nowrap; }
   .projpill { max-width: 118px; padding: 7px 10px; font-size: 0.75rem; }
   .iconbtn { width: 36px; height: 36px; }
   .howto div { font-size: 0.75rem; padding: 10px; }
@@ -416,6 +443,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
   .best::before { animation: none; }
   .lockeditor, .briefpanel, .newproject, .projects, .revise, .panel[aria-label="History"] { animation-name: settle; }
   .skeleton span { background: var(--line); animation: breathe 1.6s ease-in-out infinite alternate; }
+  .progress li.wait b { animation: breathe 1.4s ease-in-out infinite alternate; transform: none; width: 100%; }
   button:active:not(:disabled) { transform: none; }
   .knob { transition: none; }
   .grading summary::before { transition: none; }

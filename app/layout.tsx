@@ -10,7 +10,7 @@ const manrope = Manrope({ subsets: ["latin"], display: "swap", variable: "--font
 
 export const metadata: Metadata = {
   title: "Switchboard",
-  description: "Ask once. Several AIs answer. Get one best answer.",
+  description: "Ask once. Get the top answer.",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Switchboard" },
 };
 

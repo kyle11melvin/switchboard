@@ -167,6 +167,13 @@ export default function Home() {
   }
   function pickPreset(p: Preset) { setPresetLocked(true); applyPreset(p); }
   useEffect(() => { if (!idea.trim()) setPresetLocked(false); }, [idea]);
+  useEffect(() => {
+    if (!picking) return;
+    const away = (e: Event) => { if (!(e.target as Element)?.closest?.(".projwrap")) setPicking(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setPicking(false); };
+    document.addEventListener("pointerdown", away); document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", key); };
+  }, [picking]);
   function onIdeaChange(v: string) {
     setIdea(v);
     const id = predictPreset(v);
@@ -214,8 +221,8 @@ export default function Home() {
       setHistory((h) => saveHistory(h.map((x) => (x.id === id ? { ...x, verdict: v, updatedAt: Date.now() } : x))));
       sync.syncSoon();
       if (activeRun.current !== id) return;
-      setVerdict(v); setAnnounce("Best answer ready.");
-    } catch (e: any) { if (activeRun.current === id) setErr(`Couldn't combine the answers: ${e.message} Tap "Combine these answers" to try again.`); } finally { setJudging(false); }
+      setVerdict(v); setAnnounce("Top answer ready.");
+    } catch (e: any) { if (activeRun.current === id) setErr(`Couldn't get the top answer: ${e.message} Tap "Get the top answer" to try again.`); } finally { setJudging(false); }
   }
 
   async function runOne(provider: ProviderId, prompt: string, id: string): Promise<RunResult> {
@@ -256,7 +263,7 @@ export default function Home() {
     const id = uid(); setRunId(id); setRunPrompt(prompt); activeRun.current = id;
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 50);
+    setTimeout(() => window.scrollTo({ top: 0, behavior: scrollBehavior() }), 50);
 
     const finished = await Promise.all(targets.map((provider) => runOne(provider, prompt, id)));
 
@@ -295,10 +302,10 @@ export default function Home() {
   const askLabel = sendable.length > 2 ? `Ask ${sendable.length} AIs` : sendable.length ? `Ask ${sendable.map(label).join(" + ")}` : "";
   const nextStep = !sendable.length ? "Pick at least one AI above."
     : running ? (mode === "image" ? "Drawing. Pictures take about half a minute." : "Asking. Answers take up to a minute.")
-    : judging ? "Combining the answers into one. About a minute."
+    : judging ? "Working out the top answer. About a minute."
     : verdict ? "Done. Copy the answer, or tap Change something to adjust it."
     : done.length && mode === "image" ? "Done. Tap Save image to keep one, or Change something to adjust it."
-    : done.length && canJudge ? "Answers are in. Tap Combine these answers to get one best answer."
+    : done.length && canJudge ? "Answers are in. Tap Get the top answer."
     : done.length ? "Done. Tap Change something to adjust it, or Start over."
     : brief ? `Your improved question is ready. Tap ${askLabel}.`
     : idea.trim() ? `Tap ${askLabel}. Or improve the question first, if you want.`
@@ -307,12 +314,30 @@ export default function Home() {
   return (
     <main>
       <header className="top">
-        <h1 className="brand">Switchboard<span>ask once · several AIs answer · one best answer</span></h1>
+        <h1 className="brand">Switchboard<span>ask once · get the top answer</span></h1>
         <div className="topright">
-          <button className={`projpill ${project?.id !== "none" ? "has" : ""}`} aria-expanded={picking} aria-controls="projects" onClick={() => { setPicking((v) => !v); setNaming(false); }}>
-            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
-            <span>{project?.id !== "none" ? project.name : "Project"}</span>
-          </button>
+          <div className="projwrap">
+            <button className={`projpill ${project?.id !== "none" ? "has" : ""}`} aria-expanded={picking} aria-haspopup="menu" aria-controls="projects" onClick={() => { setPicking((v) => !v); setNaming(false); }}>
+              <span>{project?.id !== "none" ? project.name : "No project"}</span>
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+            </button>
+            {picking && (
+              <div className="projmenu" id="projects" role="menu" aria-label="Projects">
+                <button role="menuitemradio" aria-checked={project?.id === "none"} className={project?.id === "none" ? "on" : ""} onClick={() => { chooseProject("none"); setEditingProject(false); setPicking(false); }}>
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>No project
+                </button>
+                {shownProjects.filter((p) => p.id !== "none").map((p) => (
+                  <button key={p.id} role="menuitemradio" aria-checked={project?.id === p.id} className={project?.id === p.id ? "on" : ""} onClick={() => { chooseProject(p.id); setEditingProject(false); setPicking(false); }}>
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>{p.name}
+                  </button>
+                ))}
+                <button role="menuitem" className="new" onClick={() => { setPicking(false); setNaming(true); }}>
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>New project…
+                </button>
+                <p>A project holds things every AI should always know, like a brand's colors or a client's situation.</p>
+              </div>
+            )}
+          </div>
           {Object.keys(results).length > 0 && (
             <button className="iconbtn" aria-label="Start over" title="Start over" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setRounds([]); setRevising(false); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -341,19 +366,6 @@ export default function Home() {
           {history.length > 0 && (
             <ConfirmButton label="Clear history" question={sync.status.state === "off" ? "Clear all history?" : "Clear all history on every device?"} yes="Clear" no="Keep" onYes={() => { sync.markCleared(); setHistory([]); save(LS.history, []); historyCache.partial = false; setShowAllHistory(false); }} />
           )}
-        </section>
-      )}
-
-      {picking && (
-        <section className="panel projects" id="projects" aria-label="Projects">
-          <p className="muted projwhy">A project is a place for things every AI should always know, like a brand's colors or a client's situation. Pick one and every answer keeps it in mind.</p>
-          <div className="chips projlist" role="group" aria-label="Choose a project">
-            <button className={`chip ${project?.id === "none" ? "on" : ""}`} aria-pressed={project?.id === "none"} onClick={() => { chooseProject("none"); setEditingProject(false); setPicking(false); }}>No project</button>
-            {shownProjects.filter((p) => p.id !== "none").map((p) => (
-              <button key={p.id} className={`chip ${project?.id === p.id ? "on" : ""}`} aria-pressed={project?.id === p.id} onClick={() => { chooseProject(p.id); setEditingProject(false); setPicking(false); }}>{p.name}</button>
-            ))}
-            <button className="chip newchip" onClick={() => { setPicking(false); setNaming(true); }}>+ New project</button>
-          </div>
         </section>
       )}
 
@@ -392,11 +404,17 @@ export default function Home() {
         </section>
       )}
 
-      {/* Idea */}
-      <section className="panel idea">
+      {/* Idea. Folds away while the AIs work, so the working screen is what you see. */}
+      <section className="panel idea" hidden={running || judging}>
         <div className="row"><label className="lbl" htmlFor="idea">Ask anything</label><span className="modepill">{mode === "image" ? "Picture" : "Words"}</span></div>
         <textarea id="idea" rows={4} value={idea} onChange={(e) => onIdeaChange(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } }}
           placeholder="Type your question or what you want made. Rough is fine." />
+        {!done.length && (
+          <div className="row improverow">
+            <span className="muted">Optional</span>
+            <button className="ghost small" disabled={!idea.trim() || briefing} onClick={sharpen}>{briefing ? "Improving…" : brief ? "Improve it again" : "Improve my question first"}</button>
+          </div>
+        )}
 
         <div className="chips" role="group" aria-label="What kind of help">
           {PRESETS.map((p) => (
@@ -429,8 +447,8 @@ export default function Home() {
         </div>
         {mode === "text" && (
           <div className="row judgeRow">
-            <label className="switch"><input type="checkbox" checked={autoJudge} onChange={(e) => setAutoJudge(e.target.checked)} /><span className="track"><span className="knob" /></span> Combine the answers</label>
-            <select className="inline" aria-label="Which AI combines them" value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
+            <label className="switch"><input type="checkbox" checked={autoJudge} onChange={(e) => setAutoJudge(e.target.checked)} /><span className="track"><span className="knob" /></span> Get the top answer</label>
+            <select className="inline" aria-label="Which AI picks the top answer" value={judgeWith} onChange={(e) => setJudgeWith(e.target.value as ProviderId)}>
               {providers.filter((p) => p.configured).map((p) => <option key={p.id} value={p.id}>by {p.label}</option>)}
             </select>
           </div>
@@ -465,11 +483,29 @@ export default function Home() {
 
       <div ref={resultsRef} className="anchor" />
 
+      {(running || judging) && (
+        <section className="panel working" aria-live="polite">
+          <Mark size={96} />
+          <h2>{running ? `Asking ${Object.keys(results).length} AI${Object.keys(results).length === 1 ? "" : "s"}…` : "Working out the top answer…"}</h2>
+          <p className="muted">{running ? "Each one answers on its own. Then one of them picks the best of all of them." : `${label(judgeWith)} is reading every answer and writing the top one.`}</p>
+          <ul className="progress">
+            {Object.entries(results).map(([pid, r]) => (
+              <li key={pid} className={r === "loading" ? "wait" : r.error ? "bad" : "done"}>
+                <Logo id={pid as ProviderId} /><span>{label(pid as ProviderId)}</span>
+                <small>{r === "loading" ? (running ? "Thinking…" : "") : r.error ? "Failed" : "Done"}</small>
+                <i><b /></i>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small">This usually takes about a minute.</p>
+        </section>
+      )}
+
       {/* Verdict first — it's the thing you actually use */}
-      {(judging || verdict) && (
-        <section className="panel verdict" aria-busy={judging}>
+      {verdict && !judging && (
+        <section className="panel verdict">
           <div className="row">
-            <h2 className="lbl">{judging ? "Combining the answers…" : `Best answer · combined by ${label(judgeWith)}`}</h2>
+            <h2 className="lbl">{judging ? "Working out the top answer…" : `Top answer · by ${label(judgeWith)}`}</h2>
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <Skeleton /> : (() => {
@@ -500,7 +536,7 @@ export default function Home() {
         </section>
       )}
       {canJudge && !verdict && (
-        <button className="primary wide" onClick={() => judge(done, (brief || idea).trim(), runId ?? uid())}>Combine these answers</button>
+        <button className="primary wide" onClick={() => judge(done, (brief || idea).trim(), runId ?? uid())}>Get the top answer</button>
       )}
 
       {/* Once there's a verdict, the individual answers step back behind one button. */}
@@ -579,22 +615,18 @@ export default function Home() {
         <section className="howto">
           <div><b>1</b><span>Type a question</span></div>
           <div><b>2</b><span>Pick which AIs answer</span></div>
-          <div><b>3</b><span>Get one best answer</span></div>
+          <div><b>3</b><span>Get the top answer</span></div>
         </section>
       )}
 
       {!revising && <div className="actionbar">
         <p className="nextstep" role="status">{nextStep}</p>
         <div className="actionrow">
-        {done.length > 0 && !running ? (
+        {done.length > 0 && !running && (
           <button className="ghost" aria-expanded={revising} onClick={() => { setRevising(true); setTimeout(() => document.querySelector(".revise")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Change something</button>
-        ) : (
-          <button className="ghost" disabled={!idea.trim() || briefing} onClick={sharpen}>
-            {briefing ? "Improving…" : brief ? "Improve again" : "Improve it first"}
-          </button>
         )}
         <button className="primary" disabled={!(brief || idea).trim() || !sendable.length || running} onClick={() => send()}>
-          {running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? (sendable.length > 2 ? `Ask ${sendable.length} AIs` : `Ask ${sendable.map(label).join(" + ")}`) : "Pick at least one AI"}
+          {running ? `Asking… ${done.length} of ${Object.keys(results).length} back` : sendable.length ? `${askLabel} →` : "Pick at least one AI"}
         </button>
         </div>
       </div>}
@@ -726,6 +758,24 @@ function ResultImage({ src, name, alt }: { src: string; name: string; alt: strin
         <span role="status">{note || "Or press and hold the image."}</span>
       </figcaption>
     </figure>
+  );
+}
+
+// The Switchboard mark: three sources feeding one point.
+function Mark({ size }: { size: number }) {
+  return (
+    <svg className="markimg" viewBox="20 18 140 140" width={size} height={size} aria-hidden="true">
+      <defs>
+        <clipPath id="mk1"><circle cx="44" cy="46" r="17" /></clipPath><clipPath id="mk2"><circle cx="90" cy="38" r="17" /></clipPath><clipPath id="mk3"><circle cx="136" cy="46" r="17" /></clipPath>
+      </defs>
+      <g fill="none" strokeWidth="8" strokeLinecap="round"><path d="M44 63 V78 C44 96 60 96 78 96 H90" stroke="#62b6b3" /><path d="M90 55 V96" stroke="#ffb27f" /><path d="M136 63 V78 C136 96 120 96 102 96 H90" stroke="#7fb0d8" /></g>
+      <image href="/logos/openai.png" x="27" y="29" width="34" height="34" clipPath="url(#mk1)" />
+      <image href="/logos/anthropic.png" x="73" y="21" width="34" height="34" clipPath="url(#mk2)" />
+      <image href="/logos/xai.png" x="119" y="29" width="34" height="34" clipPath="url(#mk3)" />
+      <g fill="none" strokeWidth="5"><circle cx="44" cy="46" r="19" stroke="#62b6b3" /><circle cx="90" cy="38" r="19" stroke="#ffb27f" /><circle cx="136" cy="46" r="19" stroke="#7fb0d8" /></g>
+      <circle cx="90" cy="104" r="20" fill="var(--panel)" /><circle cx="90" cy="104" r="16" fill="var(--accent2)" />
+      <path d="M90 126 V150 M76 138 L90 152 L104 138" fill="none" stroke="var(--accent2)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
