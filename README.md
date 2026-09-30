@@ -70,6 +70,14 @@ cp .env.example .env.local   # fill in keys
 npm run dev                  # http://localhost:3000
 ```
 
+## Test
+
+```bash
+npm run build && npm test
+```
+
+Walks the whole screen in a headless browser (phone and laptop) against stand-in AIs, so it costs nothing and needs no keys: improve → ask → top answer → change something → new ask, pictures with a photo attached, a failed AI, and layout checks. `tests/fakeai.cjs` is the stand-in; `tests/flow.cjs` is the walk-through. Run it before pushing.
+
 ## Layout
 
 ```
