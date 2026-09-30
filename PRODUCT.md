@@ -33,6 +33,7 @@ The judge is the gatekeeper step Kyle otherwise does by hand. It grades answers 
 - **Keyword prediction** picks a preset as he types, until he picks one by hand.
 - **Projects and locked decisions**: each project holds a list of settled facts, one per line, that rides along with every prompt and with the judge.
 - **Image mode**: ChatGPT and Grok draw side by side. Models that cannot draw write a ready-to-paste image prompt instead. Image style templates: Auto, Poster / flyer, Product shot, Lifestyle photo, Illustration, UI mockup, Social.
+- **Carousels**: copy written as slides is laid out by Switchboard itself as 1080 × 1350 pictures with the exact words, in a chosen look, with Kyle's name, company and NMLS # on every slide. No image AI is involved. Kyle chose this over AI-drawn slides because the copy is the point and image AIs misspell text.
 - **History**: the last 200 runs, text only (images are not stored).
 - **Providers**: ChatGPT, Claude and Grok are keyed. Perplexity and Gemini are wired but have no key, so they show as "no key" and cannot be selected.
 - **Brain**: the sharpen step and the default judge run on Claude unless `BRAIN_PROVIDER` says otherwise. The judge model can be changed per run.

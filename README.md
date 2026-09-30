@@ -39,6 +39,16 @@ Model IDs drift. Override without touching code:
 
 If a card shows a `404`/`model not found` error, that's the model ID — set the override to a current one.
 
+## Carousels
+
+Copy written as "Slide 1: … Slide 2: …" can be laid out as a set of pictures with the exact words, ready for Instagram.
+
+- **Where it appears:** a "Make carousel" button on a verdict written as slides, and a "Lay out the slides" prompt when you paste slides in Creative image mode.
+- **What you can change:** each slide's headline, text and type (cover, point, closing); the look (Harbor, Navy & gold, Light); your name, company, NMLS # and phone, which sit at the bottom of every slide and fill in `[Name]`-style placeholders.
+- **Saving:** "Save all slides" opens the share sheet on a phone and downloads the files on a laptop. Slides are 1080 × 1350.
+- **No AI is called** to draw them, so there's no cost per carousel and the text is never misspelled.
+- **Code:** `lib/slides.ts` (reading slides, looks), `app/api/slide` (drawing, with its fonts), `app/Carousel.tsx` (the panel).
+
 ## Sync between devices
 
 Projects, locked decisions and run history sync between your phone and laptop.

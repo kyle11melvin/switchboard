@@ -7,6 +7,7 @@ import { predictPreset } from "@/lib/predict";
 import { IMAGE_STYLES } from "@/lib/imageStyles";
 import { HISTORY_LIMIT, isProject, isRun, mergeNewest, tidyRuns } from "@/lib/merge";
 import { useSync } from "./useSync";
+import { readSlides, type Carousel as CarouselCopy } from "@/lib/slides";
 
 type ProviderId = "openai" | "anthropic" | "xai" | "perplexity" | "gemini";
 type Mode = "text" | "image";
@@ -77,6 +78,7 @@ const DOMAIN: Record<ProviderId, string> = { openai: "openai.com", anthropic: "a
 const MONO: Record<ProviderId, string> = { openai: "C", anthropic: "A", xai: "X", perplexity: "P", gemini: "G" };
 
 // The markdown renderer is the heaviest code on the page and isn't needed until an answer lands, so it loads separately.
+const Carousel = dynamic(() => import("./Carousel"), { ssr: false, loading: () => <Skeleton /> });
 const loadMarkdown = () => import("./Markdown");
 const Markdown = dynamic(loadMarkdown, { ssr: false, loading: () => <Skeleton /> });
 
@@ -105,6 +107,7 @@ export default function Home() {
 
   const [brief, setBrief] = useState("");
   const [briefing, setBriefing] = useState(false);
+  const [carousel, setCarousel] = useState<CarouselCopy | null>(null); // slides being laid out, when that panel is open
   const [showAnswers, setShowAnswers] = useState(false); // individual answers, once a verdict has replaced them
   const [briefOpen, setBriefOpen] = useState(true); // folds away once answers arrive, so the verdict is what you see
   const [results, setResults] = useState<Record<string, RunResult | "loading">>({});
@@ -273,6 +276,9 @@ export default function Home() {
   const done = Object.values(results).filter((r) => r !== "loading") as RunResult[];
   const running = Object.values(results).some((r) => r === "loading");
   const failedCount = done.filter((r) => r.error).length;
+  // Copy written as "Slide 1: … Slide 2: …" can be laid out as a carousel.
+  const ideaSlides = useMemo(() => readSlides(idea), [idea]);
+  const verdictSlides = useMemo(() => readSlides(bestAnswer(verdict)), [verdict]);
   const verdictParts = useMemo(() => splitVerdict(verdict), [verdict]);
   const canJudge = mode === "text" && done.filter((r) => r.text && !r.error).length >= 2 && !running && !judging;
 
@@ -286,7 +292,7 @@ export default function Home() {
             <option value="__new">+ New project…</option>
           </select>
           {Object.keys(results).length > 0 && (
-            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
+            <button className="iconbtn" aria-label="New idea" title="New idea" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setCarousel(null); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           )}
@@ -366,6 +372,12 @@ export default function Home() {
         {mode === "image" && !selected.some((s) => byId[s]?.configured && byId[s]?.canImage) && (
           <p className="hint">No image-capable key yet (ChatGPT or Grok). The models below will write you a ready-to-paste image prompt instead.</p>
         )}
+        {mode === "image" && ideaSlides.slides.length >= 2 && !carousel && (
+          <div className="hint carouselhint">
+            <span>This reads as a {ideaSlides.slides.length}-slide carousel. An image AI draws one picture per request and often misspells text. Switchboard can lay out all {ideaSlides.slides.length} slides with your exact words.</span>
+            <button className="ghost small" onClick={() => { setCarousel(ideaSlides); setTimeout(() => document.querySelector(".carousel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Lay out the slides</button>
+          </div>
+        )}
         {mode === "image" && (
           <div className="chips styles" role="group" aria-label="Image style">
             {IMAGE_STYLES.map((st) => (
@@ -408,6 +420,8 @@ export default function Home() {
         </section>
       )}
 
+      {carousel && <Carousel key={carousel.slides.map((x) => x.headline).join("|")} slides={carousel.slides} caption={carousel.caption} onClose={() => setCarousel(null)} />}
+
       {err && <div className="error" role="alert">{err}</div>}
       <div className="sr" role="status" aria-live="polite">{announce}</div>
 
@@ -418,6 +432,7 @@ export default function Home() {
         <section className="panel verdict" aria-busy={judging}>
           <div className="row">
             <h2 className="lbl">Verdict {judging ? "" : `· judged blind by ${label(judgeWith)}`}</h2>
+            {verdict && verdictSlides.slides.length >= 2 && <button className="ghost small" onClick={() => { setCarousel(verdictSlides); setTimeout(() => document.querySelector(".carousel")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 60); }}>Make carousel</button>}
             {verdict && <CopyBtn text={bestAnswer(verdict)} label="Copy" />}
           </div>
           {judging ? <Skeleton /> : (() => {
