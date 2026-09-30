@@ -98,7 +98,15 @@ body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 
 .brand { min-width: 0; flex: 1; margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.625rem; letter-spacing: -0.02em; color: var(--accent2); line-height: 1.1; }
 .brand span { display: block; font-family: var(--body); font-size: 0.6875rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
 .topright { flex: none; display: flex; align-items: center; gap: 8px; }
-.projpill { background: var(--panel); border: 1px solid var(--field-line); border-radius: var(--pill); padding: 8px 12px; font-weight: 700; font-size: 0.8125rem; max-width: 150px; text-overflow: ellipsis; -webkit-appearance: none; appearance: none; }
+.projpill { display: inline-flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--field-line); border-radius: var(--pill); padding: 8px 12px; font-weight: 700; font-size: 0.8125rem; max-width: 170px; color: var(--muted); }
+.projpill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.projpill svg { flex: none; }
+.projpill.has { color: var(--text); border-color: var(--accent); }
+.projpill.has svg { color: var(--accent2); }
+.projects { display: flex; flex-direction: column; gap: 10px; animation: open 200ms var(--ease-out) backwards; }
+.projwhy { margin: 0; max-width: 60ch; }
+.projlist { margin-top: 0; }
+.newchip { border-style: dashed; color: var(--accent2); }
 .iconbtn { position: relative; width: 40px; height: 40px; border-radius: var(--pill); border: 1px solid var(--field-line); background: var(--panel); color: var(--muted); display: grid; place-items: center; padding: 0; }
 .badge { position: absolute; top: -4px; right: -4px; background: var(--accent); color: var(--accent-ink); font-size: 0.625rem; font-weight: 800; border-radius: var(--pill); min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 4px; }
 
@@ -363,7 +371,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
 @media (max-width: 480px) {
   .brand { font-size: 1.5rem; }
   .brand span { display: none; }
-  .projpill { max-width: 104px; padding: 7px 10px; font-size: 0.75rem; }
+  .projpill { max-width: 118px; padding: 7px 10px; font-size: 0.75rem; }
   .iconbtn { width: 36px; height: 36px; }
   .howto div { font-size: 0.75rem; padding: 10px; }
   .md table { font-size: 0.8125rem; }
@@ -372,7 +380,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
 @media (max-width: 350px) {
   .brand { font-size: 1.1875rem; }
   .topright { gap: 6px; }
-  .projpill { max-width: 76px; padding-left: 8px; padding-right: 8px; }
+  .projpill { max-width: 92px; padding-left: 8px; padding-right: 8px; }
   .actionrow { gap: 8px; }
   .primary { min-width: 0; }
 }
@@ -406,7 +414,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, .tablewrap:focus-v
   /* No movement: reveals become short fades, the loading shimmer becomes a slow pulse, presses don't shift. */
   .best { animation: settle 200ms ease-out backwards; }
   .best::before { animation: none; }
-  .lockeditor, .briefpanel, .newproject, .revise, .panel[aria-label="History"] { animation-name: settle; }
+  .lockeditor, .briefpanel, .newproject, .projects, .revise, .panel[aria-label="History"] { animation-name: settle; }
   .skeleton span { background: var(--line); animation: breathe 1.6s ease-in-out infinite alternate; }
   button:active:not(:disabled) { transform: none; }
   .knob { transition: none; }

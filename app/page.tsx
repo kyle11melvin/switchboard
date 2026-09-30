@@ -95,6 +95,7 @@ export default function Home() {
   const [projectId, setProjectId] = useState("none");
   const [editingProject, setEditingProject] = useState(false);
   const [naming, setNaming] = useState(false); // the "new project" form is showing
+  const [picking, setPicking] = useState(false); // the project list is open
   const [newName, setNewName] = useState("");
 
   const [idea, setIdea] = useState("");
@@ -308,10 +309,10 @@ export default function Home() {
       <header className="top">
         <h1 className="brand">Switchboard<span>ask once · several AIs answer · one best answer</span></h1>
         <div className="topright">
-          <select className="projpill" aria-label="Project" value={projectId} onChange={(e) => { const v = e.target.value; if (v === "__new") { setNaming(true); } else { setNaming(false); chooseProject(v); setEditingProject(false); } }}>
-            {shownProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            <option value="__new">+ New project…</option>
-          </select>
+          <button className={`projpill ${project?.id !== "none" ? "has" : ""}`} aria-expanded={picking} aria-controls="projects" onClick={() => { setPicking((v) => !v); setNaming(false); }}>
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
+            <span>{project?.id !== "none" ? project.name : "Project"}</span>
+          </button>
           {Object.keys(results).length > 0 && (
             <button className="iconbtn" aria-label="Start over" title="Start over" onClick={() => { activeRun.current = null; setRunId(null); setRunPrompt(""); setErr(""); setRounds([]); setRevising(false); setResults({}); setVerdict(""); setBrief(""); setIdea(""); setPresetLocked(false); window.scrollTo({ top: 0, behavior: scrollBehavior() }); }}>
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -340,6 +341,19 @@ export default function Home() {
           {history.length > 0 && (
             <ConfirmButton label="Clear history" question={sync.status.state === "off" ? "Clear all history?" : "Clear all history on every device?"} yes="Clear" no="Keep" onYes={() => { sync.markCleared(); setHistory([]); save(LS.history, []); historyCache.partial = false; setShowAllHistory(false); }} />
           )}
+        </section>
+      )}
+
+      {picking && (
+        <section className="panel projects" id="projects" aria-label="Projects">
+          <p className="muted projwhy">A project is a place for things every AI should always know, like a brand's colors or a client's situation. Pick one and every answer keeps it in mind.</p>
+          <div className="chips projlist" role="group" aria-label="Choose a project">
+            <button className={`chip ${project?.id === "none" ? "on" : ""}`} aria-pressed={project?.id === "none"} onClick={() => { chooseProject("none"); setEditingProject(false); setPicking(false); }}>No project</button>
+            {shownProjects.filter((p) => p.id !== "none").map((p) => (
+              <button key={p.id} className={`chip ${project?.id === p.id ? "on" : ""}`} aria-pressed={project?.id === p.id} onClick={() => { chooseProject(p.id); setEditingProject(false); setPicking(false); }}>{p.name}</button>
+            ))}
+            <button className="chip newchip" onClick={() => { setPicking(false); setNaming(true); }}>+ New project</button>
+          </div>
         </section>
       )}
 
