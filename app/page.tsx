@@ -20,7 +20,7 @@ interface HistoryItem {
   results: RunResult[]; verdict?: string; updatedAt?: number;
 }
 
-const LS = { projects: "sb.projects", history: "sb.history", project: "sb.project" };
+const LS = { projects: "sb.projects", history: "sb.history", project: "sb.project", inflight: "sb.inflight" };
 const load = <T,>(k: string, fallback: T): T => {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
 };
@@ -51,7 +51,7 @@ function saveHistory(list: HistoryItem[]): HistoryItem[] {
 }
 
 // One place for every server call, so failures read the same everywhere.
-async function api<T>(url: string, body?: unknown): Promise<T> {
+async function api<T>(url: string, body?: unknown, onJob?: (job: string) => void): Promise<T> {
   let r: Response;
   try {
     r = await fetch(url, body === undefined ? undefined : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -67,7 +67,48 @@ async function api<T>(url: string, body?: unknown): Promise<T> {
   if (r.status === 504 || r.status === 408) throw new Error("Timed out waiting for the model. Try again.");
   if (!r.ok) throw new Error(typeof d?.error === "string" && d.error ? d.error : `Server error (${r.status}). Try again.`);
   if (d === null) throw new Error("Got an unreadable reply from the server. Try again.");
+  // A slow answer finishes on the server (lib/jobs.ts): collect it with short requests that survive leaving the app.
+  if (typeof d?.parked === "string" && d.parked) { onJob?.(d.parked); return collect<T>(url, d.parked); }
   return d as T;
+}
+// Asks every few seconds, and straight away when the app comes back to the front. A request that drops
+// while the phone is away is nothing to worry about; only a long run of them, or an hour, gives up.
+async function collect<T>(url: string, job: string): Promise<T> {
+  const t0 = Date.now();
+  let misses = 0;
+  for (;;) {
+    await nextTick(2500);
+    try {
+      const d = await api<any>(`${url}?job=${encodeURIComponent(job)}`);
+      if (!d?.pending) return d as T;
+      misses = 0;
+    } catch (e: any) {
+      if (/no longer on the server/.test(e?.message ?? "")) throw e;
+      if (++misses >= 20) throw e;
+    }
+    if (Date.now() - t0 > 60 * 60_000) throw new Error("Still no answer after an hour. Try again.");
+  }
+}
+const nextTick = (ms: number) => new Promise<void>((resolve) => {
+  const done = () => { clearTimeout(t); document.removeEventListener("visibilitychange", back); resolve(); };
+  const back = () => { if (document.visibilityState === "visible") done(); };
+  const t = setTimeout(done, ms);
+  document.addEventListener("visibilitychange", back);
+});
+// A question that's still being answered, kept so a reopened app can pick the answers up (see resume()).
+interface Inflight { id: string; at: number; idea: string; prompt: string; mode: Mode; projectName?: string; jobs: Partial<Record<ProviderId, string>>; judgeJob?: string; providers: ProviderId[] }
+const INFLIGHT_MAX_AGE = 60 * 60_000;
+function loadInflight(): Inflight | null {
+  const v = load<any>(LS.inflight, null);
+  if (!v || typeof v.id !== "string" || typeof v.prompt !== "string" || !Array.isArray(v.providers) || typeof v.at !== "number") return null;
+  if (Date.now() - v.at > INFLIGHT_MAX_AGE) { localStorage.removeItem(LS.inflight); return null; }
+  return { ...v, jobs: v.jobs && typeof v.jobs === "object" ? v.jobs : {}, mode: v.mode === "image" ? "image" : "text" } as Inflight;
+}
+function patchInflight(id: string, patch: (f: Inflight) => Inflight | null) {
+  const f = loadInflight();
+  if (!f || f.id !== id) return;
+  const next = patch(f);
+  if (next) save(LS.inflight, next); else { try { localStorage.removeItem(LS.inflight); } catch { /* nothing to clear */ } }
 }
 // Smooth scrolling is movement too: jump straight there for people who've asked for less motion.
 const scrollBehavior = (): ScrollBehavior => (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
@@ -114,6 +155,7 @@ export default function Home() {
   const [brief, setBrief] = useState("");
   const [briefFor, setBriefFor] = useState("");
   const [notice, setNotice] = useState("");
+  const [resuming, setResuming] = useState(false); // collecting answers from before the app was closed
   const [photos, setPhotos] = useState<string[]>([]); // attached photos, shrunk, as data URLs
   const [photoNote, setPhotoNote] = useState("");
   const photoInput = useRef<HTMLInputElement>(null); // a quiet note about this run, kept until the next one // the question the improved version was written from
@@ -153,6 +195,8 @@ export default function Home() {
     setProjectId(typeof pid === "string" ? pid : "none");
     setHistory(loadHistory());
     setLoaded(true);
+    const f = loadInflight();
+    if (f) setTimeout(() => resume(f), 0);
     // Fetch the renderer once the page has settled, so it's ready before the first answer arrives.
     const t = setTimeout(() => { loadMarkdown().catch(() => {}); }, 1200);
     return () => clearTimeout(t);
@@ -255,7 +299,7 @@ export default function Home() {
     if (answers.length < 1 || judging) return;
     setErr(""); setJudging(true); setVerdict("");
     try {
-      const d = await api<{ verdict?: string; error?: string }>("/api/judge", { brief: promptUsed, answers, project: projectCtx, judge: judgeWith });
+      const d = await api<{ verdict?: string; error?: string }>("/api/judge", { brief: promptUsed, answers, project: projectCtx, judge: judgeWith }, (job) => patchInflight(id, (f) => ({ ...f, judgeJob: job })));
       if (d.error) throw new Error(d.error);
       if (!d.verdict) throw new Error("The verdict came back empty.");
       const v = d.verdict;
@@ -264,13 +308,13 @@ export default function Home() {
       sync.syncSoon();
       if (activeRun.current !== id) return;
       setVerdict(v); setAnnounce("Top answer ready.");
-    } catch (e: any) { if (activeRun.current === id) setErr(`Couldn't get the top answer: ${e.message} Tap "Get the top answer" to try again.`); } finally { setJudging(false); }
+    } catch (e: any) { if (activeRun.current === id) setErr(`Couldn't get the top answer: ${e.message} Tap "Get the top answer" to try again.`); } finally { setJudging(false); patchInflight(id, () => null); }
   }
 
   async function runOne(provider: ProviderId, prompt: string, id: string, m: Mode = mode, note = noteFor): Promise<RunResult> {
     let res: RunResult;
     try {
-      const d = await api<Partial<RunResult>>("/api/run", { provider, mode: m, prompt, project: projectCtx, presetNote: note, photos });
+      const d = await api<Partial<RunResult>>("/api/run", { provider, mode: m, prompt, project: projectCtx, presetNote: note, photos }, (job) => patchInflight(id, (f) => ({ ...f, jobs: { ...f.jobs, [provider]: job } })));
       res = { model: "", ms: 0, ...d, provider };
       if (!res.error && !res.text && !res.images?.length) res.error = "Came back empty. Try again.";
     } catch (e: any) {
@@ -332,21 +376,67 @@ export default function Home() {
     setAnnounce(`Sent to ${targets.map(label).join(", ")}.`);
     setResults(Object.fromEntries(targets.map((s) => [s, "loading" as const])));
     setTimeout(() => window.scrollTo({ top: 0, behavior: scrollBehavior() }), 50);
+    // Words are answered on the server; remember the question so a reopened app can collect them.
+    if (m === "text") save(LS.inflight, { id, at: Date.now(), idea, prompt, mode: m, projectName: projectCtx?.name, jobs: {}, providers: targets } satisfies Inflight);
 
     const finished = await Promise.all(targets.map((provider) => runOne(provider, prompt, id, m, note)));
+    finish(id, idea, prompt, m, projectCtx?.name, finished, autoJudge);
+  }
 
+  // Answers are in: keep the run, and get the top answer when that's wanted.
+  function finish(id: string, askedIdea: string, prompt: string, m: Mode, projectName: string | undefined, finished: RunResult[], wantJudge: boolean) {
     const now = Date.now();
     const item: HistoryItem = {
-      id, at: now, updatedAt: now, idea, brief: prompt, mode: m, projectName: projectCtx?.name,
+      id, at: now, updatedAt: now, idea: askedIdea, brief: prompt, mode: m, projectName,
       // Images are big; keep history light by storing text only.
       results: finished.map((r) => ({ ...r, images: undefined })),
     };
-    setHistory((h) => saveHistory([item, ...h].slice(0, HISTORY_LIMIT)));
+    setHistory((h) => saveHistory([item, ...h.filter((x) => x.id !== id)].slice(0, HISTORY_LIMIT)));
     sync.syncSoon();
 
-    if (activeRun.current === id && m === "text" && autoJudge && finished.filter((r) => r.text && !r.error).length >= 2) {
+    if (activeRun.current === id && m === "text" && wantJudge && finished.filter((r) => r.text && !r.error).length >= 2) {
       judge(finished, prompt, id);
-    }
+    } else patchInflight(id, () => null);
+  }
+
+  // The app was closed while a question was being answered: put it back on screen and collect the answers.
+  async function resume(f: Inflight) {
+    setIdea(f.idea); setRunId(f.id); setRunPrompt(f.prompt); setAskedIdea(f.idea); setMode(f.mode); activeRun.current = f.id;
+    setBrief(f.prompt === f.idea ? "" : f.prompt); setBriefFor(f.idea);
+    setPresetLocked(true); setModelsLocked(true); setSelected(f.providers);
+    setBriefOpen(false); setShowAnswers(false); setAskOpen(false); setVerdict("");
+    setResults(Object.fromEntries(f.providers.map((p) => [p, "loading" as const])));
+    setResuming(true);
+    const finished = await Promise.all(f.providers.map(async (provider): Promise<RunResult> => {
+      const job = f.jobs[provider];
+      let res: RunResult;
+      if (!job) res = { provider, model: "", error: "The app closed before this one was sent. Tap Try again.", ms: 0 };
+      else {
+        try {
+          const d = await collect<Partial<RunResult>>("/api/run", job);
+          res = { model: "", ms: 0, ...d, provider };
+          if (!res.error && !res.text && !res.images?.length) res.error = "Came back empty. Try again.";
+        } catch (e: any) { res = { provider, model: "", error: e.message, ms: 0 }; }
+      }
+      if (activeRun.current === f.id) setResults((prev) => ({ ...prev, [provider]: res }));
+      return res;
+    }));
+    setResuming(false);
+    if (activeRun.current !== f.id) return;
+    if (f.judgeJob) {
+      // The judge had already been asked; collect its verdict rather than paying for a second one.
+      finish(f.id, f.idea, f.prompt, f.mode, f.projectName, finished, false);
+      setJudging(true);
+      try {
+        const d = await collect<{ verdict?: string; error?: string }>("/api/judge", f.judgeJob);
+        if (d.error) throw new Error(d.error);
+        if (!d.verdict) throw new Error("The verdict came back empty.");
+        setHistory((h) => saveHistory(h.map((x) => (x.id === f.id ? { ...x, verdict: d.verdict, updatedAt: Date.now() } : x))));
+        sync.syncSoon();
+        if (activeRun.current === f.id) { setVerdict(d.verdict); setAnnounce("Top answer ready."); }
+      } catch (e: any) { if (activeRun.current === f.id) setErr(`Couldn't get the top answer: ${e.message} Tap "Get the top answer" to try again.`); }
+      finally { setJudging(false); patchInflight(f.id, () => null); }
+    } else finish(f.id, f.idea, f.prompt, f.mode, f.projectName, finished, true);
   }
 
   function openHistory(h: HistoryItem) {
@@ -635,7 +725,7 @@ export default function Home() {
               </li>
             ))}
           </ul>}
-          {!picking2 && <p className="muted small">This usually takes about a minute.</p>}
+          {!picking2 && <p className="muted small">{resuming ? "Picking up the answers from before the app was closed. You can leave and come back; they finish on their own." : "This usually takes about a minute. You can leave the app and come back."}</p>}
         </section>
       )}
 
