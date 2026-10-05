@@ -70,7 +70,23 @@ function key(id: ProviderId): string {
 
 const TIMEOUT_MS = 150_000;
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// A provider that says it's busy (503 "high demand", 529 "overloaded") usually answers a few seconds later,
+// so ask again twice before showing an error.
+const BUSY_WAITS_MS = [3_000, 8_000];
+
 async function postJSON(url: string, headers: Record<string, string>, body: unknown) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await postOnce(url, headers, body);
+    } catch (e: any) {
+      if (!e?.busy || attempt >= BUSY_WAITS_MS.length) throw e;
+      await sleep(BUSY_WAITS_MS[attempt]);
+    }
+  }
+}
+
+async function postOnce(url: string, headers: Record<string, string>, body: unknown) {
   // Stop before the platform kills the function, so the card gets a readable error instead of a blank timeout.
   let res: Response;
   try {
@@ -94,10 +110,15 @@ async function postJSON(url: string, headers: Record<string, string>, body: unkn
   if (!res.ok) {
     const msg = data?.error?.message || data?.error || data?.message || raw.slice(0, 300);
     const text = typeof msg === "string" ? msg : JSON.stringify(msg);
-    if (res.status === 401 || res.status === 403) throw new Error(`Key rejected (${res.status}). Check the API key in Vercel and redeploy.`);
+    // Say what the provider said too: a 403 can mean no credit or no access to the model, not just a bad key.
+    const said = /^\s*</.test(text) ? " (The reply was a web page, not a message from the AI.)" : ` (${text.slice(0, 160)})`;
     if (res.status === 402 || /insufficient|credit|quota|billing/i.test(text)) throw new Error(`Out of credit on this provider — add billing in their console. (${text.slice(0, 120)})`);
+    if (res.status === 401 || res.status === 403) throw new Error(`Key rejected (${res.status}). Check the API key in Vercel and redeploy.${said}`);
     if (res.status === 404 || /model.*not (found|exist)|does not exist/i.test(text)) throw new Error(`Model ID not recognized — set the *_MODEL env var in Vercel to a current one. (${text.slice(0, 120)})`);
     if (res.status === 429) throw new Error(`Rate limited — try again in a moment.`);
+    if (res.status === 503 || res.status === 529 || /overloaded|high demand/i.test(text)) {
+      throw Object.assign(new Error(`Busy right now — the provider says it's overloaded. Try again in a minute. (${text.slice(0, 120)})`), { busy: true });
+    }
     throw new Error(`${res.status}: ${text}`);
   }
   return data;
