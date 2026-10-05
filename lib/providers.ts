@@ -220,8 +220,10 @@ export async function runText(id: ProviderId, system: string, prompt: string, sh
         break;
       }
       case "gemini": {
-        const data = await postJSON(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key(id)}`,
+        // Google sometimes says "high demand" on every call for one model while another answers at once.
+        // After the retries fail, ask the fallback model instead so the card still gets an answer.
+        const ask = (m: string) => postJSON(
+          `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key(id)}`,
           {},
           {
             ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
@@ -234,6 +236,14 @@ export async function runText(id: ProviderId, system: string, prompt: string, sh
             }],
           },
         );
+        let data: any;
+        try { data = await ask(model); }
+        catch (e: any) {
+          const fallback = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite";
+          if (!e?.busy || fallback === model) throw e;
+          data = await ask(fallback);
+          model = fallback;
+        }
         text = (data?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("");
         break;
       }
