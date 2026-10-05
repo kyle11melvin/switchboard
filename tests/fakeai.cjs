@@ -27,6 +27,10 @@ function reply(system, user) {
   return "A short answer to: " + user.slice(0, 60);
 }
 
+// A question with "(slow)" in it takes a few seconds, like a real research answer, so tests can close
+// the app in the middle and check the answers still arrive.
+const slow = (text) => (/\(slow\)/.test(text) ? new Promise((r) => setTimeout(r, 4000)) : Promise.resolve());
+
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
   try {
@@ -47,6 +51,7 @@ globalThis.fetch = async (url, opts = {}) => {
       const parts = Array.isArray(content) ? content : [{ type: "text", text: content }];
       const text = parts.filter((c) => c.type === "text").map((c) => c.text).join("\n");
       log({ who: "anthropic", images: parts.filter((c) => c.type === "image").length, system: b.system.slice(0, 40), text: text.slice(0, 600) });
+      if (!/rough idea|decide where/.test(b.system)) await slow(text);
       return json({ content: [{ type: "text", text: reply(b.system, text) }] });
     }
     if (u.includes("api.perplexity.ai/v1/agent")) {

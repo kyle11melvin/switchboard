@@ -38,6 +38,9 @@ async function send(path: string, body: unknown): Promise<any> {
   return data;
 }
 
+// One command, for the few other things kept in the same store (see lib/jobs.ts).
+export const command = (cmd: Cmd) => run(cmd.map((c, i) => (i === 1 && typeof c === "string" ? K(c) : c)));
+
 async function run(cmd: Cmd): Promise<any> {
   const d = await send("/", cmd);
   if (d.error) throw new Error(`Sync storage: ${d.error}`);

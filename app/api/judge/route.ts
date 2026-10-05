@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runText, defaultBrain, type ProviderId } from "@/lib/providers";
 import { keepAlive } from "@/lib/stream";
+import { jobsOn, readJob, startJob } from "@/lib/jobs";
 import { blind, shortName, unblind } from "@/lib/blind";
 import { measure, measuredSection } from "@/lib/measure";
 import { GRADE_SYSTEM, WRITE_SYSTEM, judgeUserPrompt, writeUserPrompt, contextBlock, type ProjectCtx } from "@/lib/prompts";
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
   const who = judge || defaultBrain();
   const context = contextBlock(project);
 
-  return keepAlive(`judge ${who}`, async () => {
+  const work = async () => {
     // Step 1: grade, and list the best parts of each answer.
     const graded = await runText(who, [GRADE_SYSTEM, context].filter(Boolean).join("\n\n"), judgeUserPrompt(brief, blinded));
     if (graded.error) return { error: `${graded.provider}: ${graded.error}` };
@@ -55,5 +56,15 @@ export async function POST(req: Request) {
       `## Best parts\n${unblind(parts.text, names)}`,
     ].filter(Boolean).join("\n\n");
     return { verdict, model: written.model, provider: written.provider };
-  });
+  };
+  // Judging is the slowest step of all; it finishes on the server (see lib/jobs.ts) when there's a store to park it in.
+  if (jobsOn()) return NextResponse.json({ parked: await startJob(`judge ${who}`, work) });
+  return keepAlive(`judge ${who}`, work);
+}
+
+export async function GET(req: Request) {
+  const id = new URL(req.url).searchParams.get("job") || "";
+  const job = await readJob(id);
+  if (!job) return NextResponse.json({ error: "That verdict is no longer on the server. Tap \"Get the top answer\" again." }, { status: 404 });
+  return NextResponse.json(job.pending ? { pending: true } : job.result, { headers: { "cache-control": "no-store" } });
 }

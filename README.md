@@ -55,6 +55,10 @@ Projects, locked decisions and run history sync between your phone and laptop.
 - **Limits:** the newest 200 runs are kept. Images are not stored.
 - **Code:** `lib/merge.ts` (the rules), `lib/store.ts` (storage), `app/api/sync` (the endpoint), `app/useSync.ts` (the browser side).
 
+## Leaving the app while it works
+
+Phones close a web app's connections the moment you switch away, and a research answer can take two minutes. So text answers and the judge's verdict finish on the server: `/api/run` and `/api/judge` hand back a `parked` id at once, keep working after the reply has gone out (Next's `after()`), and put the result in the sync store for an hour. The browser collects it with short requests, straight away when the app comes back to the front, and a question in progress is remembered on the device so a reopened app picks its answers up instead of asking again. Pictures still arrive on the open connection; they're too big to park. Without the sync store the routes answer inline as before. Code: `lib/jobs.ts`, `collect` and `resume` in `app/page.tsx`.
+
 ## Login protection
 
 Wrong passwords are slowed down in two places:
@@ -76,7 +80,7 @@ npm run dev                  # http://localhost:3000
 npm run build && npm test
 ```
 
-Walks the whole screen in a headless browser (phone and laptop) against stand-in AIs, so it costs nothing and needs no keys: improve → ask → top answer → change something → new ask, pictures with a photo attached, a failed AI, and layout checks. `tests/fakeai.cjs` is the stand-in; `tests/flow.cjs` is the walk-through. Run it before pushing.
+Walks the whole screen in a headless browser (phone and laptop) against stand-in AIs, so it costs nothing and needs no keys: improve → ask → top answer → change something → new ask, pictures with a photo attached, closing the app mid-answer and reopening it, a failed AI, and layout checks. `tests/fakeai.cjs` is the stand-in; `tests/flow.cjs` is the walk-through. Run it before pushing.
 
 ## Layout
 

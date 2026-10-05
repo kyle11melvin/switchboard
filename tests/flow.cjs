@@ -21,7 +21,7 @@ async function start() {
   reset();
   const server = spawn("npx", ["next", "start", "-p", String(PORT)], {
     cwd: ROOT, stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, OPENAI_API_KEY: "fake", ANTHROPIC_API_KEY: "fake", XAI_API_KEY: "fake", APP_PASSWORD: "", FAKEAI_LOG: LOG, NODE_OPTIONS: `--require ${path.join(__dirname, "fakeai.cjs")}` },
+    env: { ...process.env, OPENAI_API_KEY: "fake", ANTHROPIC_API_KEY: "fake", XAI_API_KEY: "fake", APP_PASSWORD: "", FAKEAI_LOG: LOG, JOBS_MEMORY: "1", NODE_OPTIONS: `--require ${path.join(__dirname, "fakeai.cjs")}` },
   });
   for (let i = 0; i < 60; i++) {
     try { execSync(`curl -sf -o /dev/null ${BASE}/login`); return server; } catch { await sleep(500); }
@@ -124,6 +124,26 @@ const hint = (p) => p.locator(".nextstep").textContent().then((t) => t.trim());
       await sleep(300);
       ok("a picture run from history offers Redraw", /Redraw/.test(await bar(p)), await bar(p));
       ok("no page errors (pictures)", errors.length === 0, errors.join("; "));
+      await p.context().close();
+    }
+
+    // ---- Closing the app mid-answer: reopen, and the answers still arrive
+    {
+      const { p, errors } = await page(browser, true);
+      await p.fill("#idea", "Write an instagram post about rate buydowns (slow)");
+      reset();
+      await p.locator(".actionrow .primary").click();
+      await p.waitForSelector(".panel.working", { timeout: 5000 });
+      await sleep(1500);
+      const before = calls().filter((x) => ["openai-chat", "xai-chat"].includes(x.who) || (x.who === "anthropic" && !/rough idea|gatekeeper|final answer|decide where/.test(x.system))).length;
+      await p.reload({ waitUntil: "networkidle" });
+      ok("reopened app says it's picking the answers up", /Picking up the answers/.test(await p.locator(".panel.working").textContent().catch(() => "")));
+      await p.waitForSelector(".verdict .best p", { timeout: 40000 });
+      const after = calls().filter((x) => ["openai-chat", "xai-chat"].includes(x.who) || (x.who === "anthropic" && !/rough idea|gatekeeper|final answer|decide where/.test(x.system))).length;
+      ok("the answers from before the app closed were used, not asked for again", after === before && before === 3, `${before} -> ${after}`);
+      ok("the top answer arrived after reopening", /top answer/i.test(await p.locator(".verdict .best").textContent()));
+      ok("history has the run once", (await p.locator(".badge").first().textContent()) === "1");
+      ok("no page errors (reopen)", errors.length === 0, errors.join("; "));
       await p.context().close();
     }
 
