@@ -43,7 +43,9 @@ export const PROVIDERS: Record<ProviderId, ProviderDef> = {
   perplexity: {
     label: "Perplexity",
     keyEnv: "PERPLEXITY_API_KEY",
-    textModel: () => process.env.PERPLEXITY_MODEL || "sonar-pro",
+    // Agent API names: a model slug like "perplexity/sonar", or a preset ("fast", "low", "medium", "high").
+    // The old Sonar names (sonar, sonar-pro, …) stopped working on 2026-09-27; perplexityAsk maps them.
+    textModel: () => process.env.PERPLEXITY_MODEL || "perplexity/sonar",
   },
   gemini: {
     label: "Gemini",
@@ -124,7 +126,7 @@ async function postOnce(url: string, headers: Record<string, string>, body: unkn
   return data;
 }
 
-// OpenAI-compatible chat (OpenAI, xAI, Perplexity all share this shape)
+// OpenAI-compatible chat (OpenAI and xAI share this shape)
 // A picture shown to a model alongside the prompt, as a data URL ("data:image/jpeg;base64,…").
 export interface Shown { label: string; dataUrl: string }
 const parts = (img: Shown) => { const m = /^data:(image\/[a-z+.-]+);base64,(.+)$/i.exec(img.dataUrl); return m ? { type: m[1], data: m[2] } : null; };
@@ -151,10 +153,38 @@ async function openAICompatible(url: string, apiKey: string, model: string, syst
   return { text, citations };
 }
 
-// `shown` lets the model look at pictures too. Perplexity can't, so it gets the words only.
+// Perplexity's Agent API (POST /v1/agent). Searching the web is opt-in there, so it's asked for on every call.
+// Failures can come back as HTTP 200 with status "failed", so the status field is what's checked.
+const PRESETS = new Set(["fast", "low", "medium", "high", "xhigh"]);
+const LEGACY_SONAR: Record<string, string> = {
+  sonar: "perplexity/sonar", "sonar-pro": "perplexity/sonar",
+  "sonar-reasoning": "low", "sonar-reasoning-pro": "low", "sonar-deep-research": "medium",
+};
+async function perplexityAsk(apiKey: string, model: string, system: string, prompt: string) {
+  const name = LEGACY_SONAR[model] ?? model;
+  const body: Record<string, unknown> = {
+    ...(PRESETS.has(name) ? { preset: name } : { model: name, tools: [{ type: "web_search" }], tool_choice: { type: "web_search" } }),
+    ...(system ? { instructions: system } : {}),
+    input: prompt,
+    max_output_tokens: 8000,
+  };
+  const data = await postJSON("https://api.perplexity.ai/v1/agent", { authorization: `Bearer ${apiKey}` }, body);
+  if (data?.status === "failed" || data?.status === "cancelled") {
+    const err = data?.error; const msg = typeof err === "string" ? err : err?.message || JSON.stringify(err);
+    throw new Error(`Perplexity stopped (${data.status}): ${msg}`);
+  }
+  const output: any[] = Array.isArray(data?.output) ? data.output : [];
+  const text: string = typeof data?.output_text === "string" && data.output_text
+    ? data.output_text
+    : output.filter((i) => i?.type === "message").flatMap((i) => i.content ?? []).filter((c: any) => c?.type === "output_text").map((c: any) => c.text ?? "").join("");
+  const citations: string[] = output.filter((i) => i?.type === "search_results").flatMap((i) => i.results ?? []).map((r: any) => r?.url).filter(Boolean);
+  return { text, citations, served: typeof data?.model === "string" ? data.model : undefined };
+}
+
+// `shown` lets the model look at pictures too. Perplexity's API only takes pictures as links, so it gets the words only.
 export async function runText(id: ProviderId, system: string, prompt: string, shown: Shown[] = []): Promise<RunResult> {
   const t0 = Date.now();
-  const model = PROVIDERS[id].textModel();
+  let model = PROVIDERS[id].textModel();
   try {
     let text = "";
     let citations: string[] = [];
@@ -165,9 +195,12 @@ export async function runText(id: ProviderId, system: string, prompt: string, sh
       case "xai":
         ({ text } = await openAICompatible("https://api.x.ai/v1/chat/completions", key(id), model, system, prompt, shown));
         break;
-      case "perplexity":
-        ({ text, citations } = await openAICompatible("https://api.perplexity.ai/chat/completions", key(id), model, system, prompt));
+      case "perplexity": {
+        let served: string | undefined;
+        ({ text, citations, served } = await perplexityAsk(key(id), model, system, prompt));
+        if (served) model = served; // a preset picks the model; show the one that answered
         break;
+      }
       case "anthropic": {
         const data = await postJSON(
           "https://api.anthropic.com/v1/messages",

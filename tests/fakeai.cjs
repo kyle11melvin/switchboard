@@ -49,6 +49,18 @@ globalThis.fetch = async (url, opts = {}) => {
       log({ who: "anthropic", images: parts.filter((c) => c.type === "image").length, system: b.system.slice(0, 40), text: text.slice(0, 600) });
       return json({ content: [{ type: "text", text: reply(b.system, text) }] });
     }
+    if (u.includes("api.perplexity.ai/v1/agent")) {
+      const b = JSON.parse(opts.body);
+      const text = typeof b.input === "string" ? b.input : b.input.map((m) => m.content).join("\n");
+      log({ who: "perplexity", preset: b.preset, model: b.model, search: Boolean(b.tools?.length), text: text.slice(0, 600) });
+      return json({
+        status: "completed", model: b.model || "perplexity/sonar",
+        output: [
+          { type: "search_results", results: [{ url: "https://example.com/source", title: "A source" }] },
+          { type: "message", content: [{ type: "output_text", text: reply(b.instructions || "", text) }] },
+        ],
+      });
+    }
     if (u.includes("/v1/chat/completions")) {
       const who = u.includes("x.ai") ? "xai-chat" : "openai-chat";
       const b = JSON.parse(opts.body); const sys = b.messages.find((m) => m.role === "system")?.content || "";

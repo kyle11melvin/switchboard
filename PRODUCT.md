@@ -35,7 +35,7 @@ The judge is the gatekeeper step Kyle otherwise does by hand. It grades answers 
 - **Projects and locked decisions**: each project holds a list of settled facts, one per line, that rides along with every prompt and with the judge.
 - **Image mode**: ChatGPT and Grok draw side by side. Models that cannot draw write a ready-to-paste image prompt instead. Image style templates: Auto, Poster / flyer, Product shot, Lifestyle photo, Illustration, UI mockup, Social.
 - **History**: the last 200 runs, text only (images are not stored).
-- **Providers**: ChatGPT, Claude and Grok are keyed. Perplexity and Gemini are wired but have no key, so they show as "no key" and cannot be selected.
+- **Providers**: ChatGPT, Claude, Grok, Perplexity and Gemini are all keyed. Perplexity talks to the Agent API (`/v1/agent`); the old Sonar chat endpoint was retired on 2026-09-27.
 - **Brain**: the sharpen step and the default judge run on Claude unless `BRAIN_PROVIDER` says otherwise. The judge model can be changed per run.
 
 ## Capabilities and Constraints
