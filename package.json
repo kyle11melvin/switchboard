@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node tests/flow.cjs"
+    "test": "npm run test:ask && node tests/flow.cjs",
+    "test:ask": "FAKEAI_LOG=tests/.fakeai.log node tests/ask.cjs"
   },
   "author": "",
   "license": "ISC",

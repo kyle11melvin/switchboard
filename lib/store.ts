@@ -43,6 +43,8 @@ async function run(cmd: Cmd): Promise<any> {
   if (d.error) throw new Error(`Sync storage: ${d.error}`);
   return d.result;
 }
+// One command, for other modules that keep small counters here (lib/usage.ts).
+export const redis = run;
 async function runAll(cmds: Cmd[]): Promise<any[]> {
   if (!cmds.length) return [];
   const d = await send("/pipeline", cmds);
