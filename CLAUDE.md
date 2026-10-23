@@ -51,8 +51,9 @@ the real icon is `mobile/assets/icon.png`; provider marks are in `mobile/src/log
 
 ## Scope for v1
 
-In: the pipeline, accounts, history, the "what was challenged" view, subscriptions with monthly caps and
-question packs, what Apple requires. Out (kept in the web tool, not in the app): image mode, Grok, photos,
+In: the pipeline, follow-ups (a thread: each follow-up runs the whole pipeline again with the earlier
+rounds in hand, and counts as a question), accounts, history, the "what was challenged" view,
+subscriptions with monthly caps and question packs, what Apple requires. Out (kept in the web tool, not in the app): image mode, Grok, photos,
 projects and locked decisions, "change something", password sync. No new product features.
 
 ## The plan
@@ -73,6 +74,8 @@ projects and locked decisions, "change something", password sync. No new product
 - Keep replies short. He said "GO" to start the rebuild and picked 1B / 2B on the look.
 - A question must feel answered within about a minute and the answer must fit a phone screen; he
   called a two-minute, report-length answer unshippable (2026-10-23).
+- He called follow-ups "a big feature and a much-needed one" (2026-10-23): a user must be able to
+  narrow or push on an answer without starting over.
 - This repo is public. No prices, margins or anything from his email in it.
 
 ## Testing

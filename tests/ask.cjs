@@ -11,10 +11,13 @@ const TOKEN = "test-token";
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = "") => { cond ? pass++ : fail++; console.log(`${cond ? "PASS" : "FAIL"}  ${name}${extra ? `  [${extra}]` : ""}`); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const stop = (server) => { try { process.kill(-server.pid, "SIGTERM"); } catch { server.kill(); } };
 
 async function start() {
+  // Its own process group, so stopping it also stops the next-server it spawns (otherwise that one lives
+  // on, holds the port, and the next test run talks to a stale build).
   const server = spawn("npx", ["next", "start", "-p", String(PORT)], {
-    cwd: ROOT, stdio: ["ignore", "pipe", "pipe"],
+    cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: true,
     env: {
       ...process.env, OPENAI_API_KEY: "fake", ANTHROPIC_API_KEY: "fake", GEMINI_API_KEY: "fake", PERPLEXITY_API_KEY: "fake", XAI_API_KEY: "",
       APP_PASSWORD: "a-password", ASK_TOKEN: TOKEN, HOUSE_RULES: "HOUSE RULES: never say banana.", KV_REST_API_URL: "", KV_REST_API_TOKEN: "",
@@ -25,7 +28,7 @@ async function start() {
   for (let i = 0; i < 60; i++) {
     try { execSync(`curl -sf -o /dev/null ${BASE}/login`); return server; } catch { await sleep(500); }
   }
-  server.kill(); throw new Error("Server didn't start. Did you run npm run build?");
+  stop(server); throw new Error("Server didn't start. Did you run npm run build?");
 }
 
 async function askStream(body, headers = {}) {
@@ -91,13 +94,21 @@ async function askStream(body, headers = {}) {
     ok("the sharpen, answer and write steps were told it is for a phone", log.filter((c) => c.who === "anthropic" && c.phone).length === 3, JSON.stringify(log.filter((c) => c.who === "anthropic").map((c) => [c.system, c.phone])));
     ok("the top answer was asked for as a stream", log.filter((c) => c.who === "anthropic" && c.stream).length === 1);
 
+    // A follow-up carries the earlier round into the pick and the sharpen, and counts as one more question
+    const f = await askStream({ question: "local lenders only", tier: "standard", prior: [{ question: "Who is the best VA lender in San Antonio?", answer: "Veterans United, then Navy Federal." }] });
+    ok("follow-up finished with a top answer", f.events.some((e) => e.type === "answered"), f.events.map((e) => e.type).join(" > "));
+    const log2 = fs.readFileSync(process.env.FAKEAI_LOG, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const briefCalls = log2.filter((c) => c.who === "anthropic" && /tight brief/.test(c.system));
+    ok("the sharpen step saw the earlier round and the follow-up rule", briefCalls.some((c) => /EARLIER ROUNDS/.test(c.text) && /San Antonio/.test(c.text) && c.followup), JSON.stringify(briefCalls.map((c) => [c.text.slice(0, 60), c.followup])));
+    ok("the pick step saw the earlier round too", log2.some((c) => c.who === "anthropic" && /decide where/.test(c.system) && /San Antonio/.test(c.text)));
+
     // Premium plan routes to the strongest models
     const p = await askStream({ question: "Write a caption for a photo of my dog at the beach", tier: "premium" });
     const pp = p.events.find((e) => e.type === "picked");
     ok("premium writing uses opus and gpt-5", pp && pp.job === "writing" && pp.ais.some((a) => a.model === "claude-opus-5-5") && pp.ais.some((a) => a.model === "gpt-5"), JSON.stringify(pp && pp.ais));
     ok("premium finished with a top answer", p.events.some((e) => e.type === "answered"));
   } finally {
-    server.kill();
+    stop(server);
   }
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
