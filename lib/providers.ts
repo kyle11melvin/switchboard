@@ -90,10 +90,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // so ask again twice before showing an error.
 const BUSY_WAITS_MS = [3_000, 8_000];
 
-async function postJSON(url: string, headers: Record<string, string>, body: unknown) {
+async function withBusyRetry<T>(work: () => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await postOnce(url, headers, body);
+      return await work();
     } catch (e: any) {
       if (!e?.busy || attempt >= BUSY_WAITS_MS.length) throw e;
       await sleep(BUSY_WAITS_MS[attempt]);
@@ -101,11 +101,12 @@ async function postJSON(url: string, headers: Record<string, string>, body: unkn
   }
 }
 
-async function postOnce(url: string, headers: Record<string, string>, body: unknown) {
-  // Stop before the platform kills the function, so the card gets a readable error instead of a blank timeout.
-  let res: Response;
+const postJSON = (url: string, headers: Record<string, string>, body: unknown) => withBusyRetry(() => postOnce(url, headers, body));
+
+// Stop before the platform kills the function, so the card gets a readable error instead of a blank timeout.
+async function send(url: string, headers: Record<string, string>, body: unknown): Promise<Response> {
   try {
-    res = await fetch(url, {
+    return await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
@@ -115,6 +116,10 @@ async function postOnce(url: string, headers: Record<string, string>, body: unkn
     if (e?.name === "TimeoutError" || e?.name === "AbortError") throw new Error(`No reply after ${TIMEOUT_MS / 1000} seconds. Try again.`);
     throw new Error("Couldn't reach this provider. It may be down. Try again in a moment.");
   }
+}
+
+async function postOnce(url: string, headers: Record<string, string>, body: unknown) {
+  const res = await send(url, headers, body);
   const raw = await res.text();
   let data: any;
   try {
@@ -122,21 +127,24 @@ async function postOnce(url: string, headers: Record<string, string>, body: unkn
   } catch {
     data = { raw };
   }
-  if (!res.ok) {
-    const msg = data?.error?.message || data?.error || data?.message || raw.slice(0, 300);
-    const text = typeof msg === "string" ? msg : JSON.stringify(msg);
-    // Say what the provider said too: a 403 can mean no credit or no access to the model, not just a bad key.
-    const said = /^\s*</.test(text) ? " (The reply was a web page, not a message from the AI.)" : ` (${text.slice(0, 160)})`;
-    if (res.status === 402 || /insufficient|credit|quota|billing/i.test(text)) throw new Error(`Out of credit on this provider — add billing in their console. (${text.slice(0, 120)})`);
-    if (res.status === 401 || res.status === 403) throw new Error(`Key rejected (${res.status}). Check the API key in Vercel and redeploy.${said}`);
-    if (res.status === 404 || /model.*not (found|exist)|does not exist/i.test(text)) throw new Error(`Model ID not recognized — set the *_MODEL env var in Vercel to a current one. (${text.slice(0, 120)})`);
-    if (res.status === 429) throw new Error(`Rate limited — try again in a moment.`);
-    if (res.status === 503 || res.status === 529 || /overloaded|high demand/i.test(text)) {
-      throw Object.assign(new Error(`Busy right now — the provider says it's overloaded. Try again in a minute. (${text.slice(0, 120)})`), { busy: true });
-    }
-    throw new Error(`${res.status}: ${text}`);
-  }
+  if (!res.ok) failFor(res.status, raw, data);
   return data;
+}
+
+// Turn a provider's refusal into a sentence the card can show.
+function failFor(status: number, raw: string, data: any): never {
+  const msg = data?.error?.message || data?.error || data?.message || raw.slice(0, 300);
+  const text = typeof msg === "string" ? msg : JSON.stringify(msg);
+  // Say what the provider said too: a 403 can mean no credit or no access to the model, not just a bad key.
+  const said = /^\s*</.test(text) ? " (The reply was a web page, not a message from the AI.)" : ` (${text.slice(0, 160)})`;
+  if (status === 402 || /insufficient|credit|quota|billing/i.test(text)) throw new Error(`Out of credit on this provider — add billing in their console. (${text.slice(0, 120)})`);
+  if (status === 401 || status === 403) throw new Error(`Key rejected (${status}). Check the API key in Vercel and redeploy.${said}`);
+  if (status === 404 || /model.*not (found|exist)|does not exist/i.test(text)) throw new Error(`Model ID not recognized — set the *_MODEL env var in Vercel to a current one. (${text.slice(0, 120)})`);
+  if (status === 429) throw new Error(`Rate limited — try again in a moment.`);
+  if (status === 503 || status === 529 || /overloaded|high demand/i.test(text)) {
+    throw Object.assign(new Error(`Busy right now — the provider says it's overloaded. Try again in a minute. (${text.slice(0, 120)})`), { busy: true });
+  }
+  throw new Error(`${status}: ${text}`);
 }
 
 // OpenAI-compatible chat (OpenAI and xAI share this shape)
@@ -269,6 +277,72 @@ export async function runText(id: ProviderId, system: string, prompt: string, sh
   } catch (e: any) {
     return { provider: id, model, error: e?.message ?? String(e), ms: Date.now() - t0 };
   }
+}
+
+// The same call, but the words arrive as they are written. Only Claude streams here (it is the brain on
+// both plans); any other provider answers in one piece and onText is called once with the whole reply.
+// onText always gets the whole text so far, never a fragment.
+export async function runTextStream(id: ProviderId, system: string, prompt: string, opts: RunOpts, onText: (soFar: string) => void): Promise<RunResult> {
+  if (id !== "anthropic") {
+    const r = await runText(id, system, prompt, [], opts);
+    if (r.text) onText(r.text);
+    return r;
+  }
+  const t0 = Date.now();
+  const model = opts.model || PROVIDERS[id].textModel();
+  try {
+    const { text, usage } = await withBusyRetry(() => anthropicStream(key(id), model, system, prompt, onText));
+    if (!text) throw new Error("Empty response");
+    return { provider: id, model, text, ms: Date.now() - t0, usage };
+  } catch (e: any) {
+    return { provider: id, model, error: e?.message ?? String(e), ms: Date.now() - t0 };
+  }
+}
+
+async function anthropicStream(apiKey: string, model: string, system: string, prompt: string, onText: (soFar: string) => void) {
+  const res = await send(
+    "https://api.anthropic.com/v1/messages",
+    { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+    { model, max_tokens: 8000, system: system || undefined, messages: [{ role: "user", content: [{ type: "text", text: prompt }] }], stream: true },
+  );
+  if (!res.ok) {
+    const raw = await res.text();
+    let data: any; try { data = JSON.parse(raw); } catch { data = { raw }; }
+    failFor(res.status, raw, data);
+  }
+  // A reply that is not a stream (a stand-in, or a proxy that buffered it) is read as the usual JSON.
+  if (!/text\/event-stream/i.test(res.headers.get("content-type") || "")) {
+    const data: any = await res.json().catch(() => null);
+    const text = (data?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
+    if (text) onText(text);
+    return { text, usage: readUsage(data) };
+  }
+  const reader = res.body!.getReader();
+  const dec = new TextDecoder();
+  let buf = ""; let text = ""; let input = 0; let output = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i: number;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (!line.startsWith("data:")) continue;
+        let d: any;
+        try { d = JSON.parse(line.slice(5).trim()); } catch { continue; }
+        if (d.type === "content_block_delta" && d.delta?.type === "text_delta") { text += d.delta.text; onText(text); }
+        else if (d.type === "message_start") input = Number(d.message?.usage?.input_tokens ?? 0);
+        else if (d.type === "message_delta") output = Number(d.usage?.output_tokens ?? output);
+        else if (d.type === "error") throw new Error(d.error?.message || "The stream failed.");
+      }
+    }
+  } catch (e: any) {
+    if (e?.name === "TimeoutError" || e?.name === "AbortError") throw new Error(`No reply after ${TIMEOUT_MS / 1000} seconds. Try again.`);
+    throw e;
+  }
+  return { text, usage: input || output ? { input, output } : undefined };
 }
 
 const IMAGE_PROMPT_SYSTEM = `You cannot generate images, so instead write ONE production-ready image-generation prompt for the idea. Output only the prompt (60-120 words): subject, composition, lens/lighting, style, mood, aspect ratio, and "no text" unless text is requested. Then on a new line add "Negative: " with 5-8 things to avoid.`;

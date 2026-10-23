@@ -58,7 +58,10 @@ async function askStream(body, headers = {}) {
     const r = await askStream({ question: "I built an app. How do I turn it into a profitable business?", tier: "standard" });
     ok("streams 200", r.status === 200);
     const types = r.events.map((e) => e.type);
-    ok("events in order", JSON.stringify(types.filter((t) => t !== "answer")) === JSON.stringify(["usage", "picked", "sharpened", "challenged", "answered", "done"]), types.join(" > "));
+    ok("events in order", JSON.stringify(types.filter((t) => t !== "answer" && t !== "writing")) === JSON.stringify(["usage", "picked", "sharpened", "challenged", "answered", "done"]), types.join(" > "));
+    ok("the top answer streamed before it landed", types.includes("writing") && types.indexOf("writing") > types.indexOf("challenged") && types.lastIndexOf("writing") < types.indexOf("answered"), types.join(" > "));
+    const writing = r.events.filter((e) => e.type === "writing");
+    ok("what streamed is the answer, never its headings", writing.every((w) => /^The top answer/.test(w.best) && !/##/.test(w.best)), JSON.stringify(writing.map((w) => w.best)));
     const picked = r.events.find((e) => e.type === "picked");
     ok("picked research with its three AIs", picked && picked.job === "research" && picked.ais.length === 3 && picked.ais.map((a) => a.provider).sort().join() === "anthropic,gemini,perplexity", JSON.stringify(picked && picked.ais));
     ok("standard plan asks the standard models", picked && picked.ais.some((a) => a.model === "claude-sonnet-5-5") && picked.ais.some((a) => a.model === "perplexity/sonar"));
@@ -74,6 +77,7 @@ async function askStream(body, headers = {}) {
     ok("agree and split carry real names, not letters", ch && /validate demand/i.test(ch.agree) && !/Answer [A-C]/.test(ch.split) && /(Claude|Gemini|Perplexity)/.test(ch.split), ch && ch.split);
     const ans = r.events.find((e) => e.type === "answered");
     ok("top answer written by the brain", ans && /top answer/i.test(ans.best) && ans.provider === "anthropic" && ans.checked.length === 3);
+    ok("the short answer and the detail come apart", ans && ans.best === "The top answer, built from the best parts." && ans.more === "The detail worth keeping.", ans && JSON.stringify([ans.best, ans.more]));
     const done = r.events.find((e) => e.type === "done");
     ok("seven calls counted", done && done.cost.calls === 7, done && String(done.cost.calls));
     ok("cost is dollars, not zero", done && done.cost.usd > 0 && done.cost.usd < 0.2 && done.cost.unpriced.length === 0, done && JSON.stringify(done.cost));
@@ -84,6 +88,8 @@ async function askStream(body, headers = {}) {
     const log = fs.readFileSync(process.env.FAKEAI_LOG, "utf8").trim().split("\n").map((l) => JSON.parse(l));
     ok("house rules were not sent to the app's AIs", !log.some((c) => /banana/.test(JSON.stringify(c))));
     ok("gemini key travels in a header, not the URL", log.some((c) => c.who === "gemini" && c.keyInHeader));
+    ok("the sharpen, answer and write steps were told it is for a phone", log.filter((c) => c.who === "anthropic" && c.phone).length === 3, JSON.stringify(log.filter((c) => c.who === "anthropic").map((c) => [c.system, c.phone])));
+    ok("the top answer was asked for as a stream", log.filter((c) => c.who === "anthropic" && c.stream).length === 1);
 
     // Premium plan routes to the strongest models
     const p = await askStream({ question: "Write a caption for a photo of my dog at the beach", tier: "premium" });

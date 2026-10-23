@@ -23,9 +23,11 @@ Never claim an answer is guaranteed correct; claim it was checked against other 
 
 ## The pipeline (seven model calls per question)
 
-pick the job and the AIs → sharpen the question → two or three independent answers in parallel →
-grade blind (tags: strong recommendation / potential weakness / used / not used, see `lib/tags.ts`) →
-write one answer from the best parts → report cost. Plans and their models are in `lib/tiers.ts`
+pick the job and the AIs, and sharpen the question (these two run side by side) → two or three
+independent answers in parallel → grade blind (tags: strong recommendation / potential weakness / used /
+not used, see `lib/tags.ts`) → write one answer from the best parts, streamed as it is written → report
+cost. Everything is told it is for a phone (`PHONE_*` in `lib/prompts.ts`, app only): the top answer is
+under 120 words, with the detail under "More". Plans and their models are in `lib/tiers.ts`
 (standard: Claude Sonnet brain; premium: Claude Opus brain), jobs in `lib/jobs.ts`, cost rates in
 `lib/cost.ts`, monthly caps in `lib/usage.ts` (counted per device until accounts exist).
 
@@ -69,6 +71,8 @@ projects and locked decisions, "change something", password sync. No new product
 - His messages are dictated and sometimes garbled; read for intent, confirm wording that ships.
 - Ship a whole step, then list what is missing. Don't ask permission for reversible work.
 - Keep replies short. He said "GO" to start the rebuild and picked 1B / 2B on the look.
+- A question must feel answered within about a minute and the answer must fit a phone screen; he
+  called a two-minute, report-length answer unshippable (2026-10-23).
 - This repo is public. No prices, margins or anything from his email in it.
 
 ## Testing

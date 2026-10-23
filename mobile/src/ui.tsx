@@ -1,6 +1,6 @@
 // The pieces of the look: the light behind everything, glass cards, tags, buttons, the AI marks.
 import React from "react";
-import { Pressable, StyleSheet, Text, View, type ViewStyle, type StyleProp } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View, type ViewStyle, type StyleProp } from "react-native";
 import Svg, { Defs, RadialGradient, Stop, Ellipse, Rect, Path } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { C, F, R, glow, PROVIDER, type ProviderId } from "./theme";
@@ -108,40 +108,75 @@ export function Links({ width, colors }: { width: number; colors: string[] }) {
   );
 }
 
-// A small markdown reader: paragraphs, bullets, **bold**. Enough for the top answer.
+// A small markdown reader for what the AIs write: paragraphs, headings, bullets, code blocks, **bold**,
+// `code` and [links](url). Read line by line, so a heading followed straight by text still reads as two.
+type Block = { kind: "p"; text: string } | { kind: "h"; text: string } | { kind: "list"; items: string[] } | { kind: "code"; text: string };
+
+function parse(text: string): Block[] {
+  const blocks: Block[] = [];
+  let para: string[] = []; let list: string[] = []; let code: string[] | null = null;
+  const flush = () => {
+    if (para.length) { blocks.push({ kind: "p", text: para.join(" ") }); para = []; }
+    if (list.length) { blocks.push({ kind: "list", items: list }); list = []; }
+  };
+  for (const raw of text.replace(/\r/g, "").split("\n")) {
+    const line = raw.trimEnd();
+    if (/^\s*```/.test(line)) {
+      if (code) { blocks.push({ kind: "code", text: code.join("\n") }); code = null; } else { flush(); code = []; }
+      continue;
+    }
+    if (code) { code.push(raw); continue; }
+    if (!line.trim() || /^\s*([-*_]\s*){3,}$/.test(line)) { flush(); continue; }
+    const h = /^\s*#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
+    if (h) { flush(); blocks.push({ kind: "h", text: h[1] }); continue; }
+    const b = /^\s*([-*•]|\d+[.)])\s+(.*)$/.exec(line);
+    if (b) { if (para.length) flush(); list.push(line.trim()); continue; }
+    if (list.length && /^\s{2,}/.test(raw)) { list[list.length - 1] += " " + line.trim(); continue; } // a bullet wrapped onto the next line
+    if (list.length) flush();
+    para.push(line.replace(/^\s*>\s?/, "").trim());
+  }
+  if (code) blocks.push({ kind: "code", text: code.join("\n") });
+  flush();
+  return blocks;
+}
+
 export function Markdown({ text, size = 15, color = C.fg }: { text: string; size?: number; color?: string }) {
-  const blocks = text.replace(/\r/g, "").split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  const body = { fontFamily: F.body, fontSize: size, lineHeight: size * 1.45, color };
   return (
     <View style={{ gap: 8 }}>
-      {blocks.map((b, i) => {
-        const lines = b.split("\n");
-        if (lines.every((l) => /^\s*([-*•]|\d+[.)])\s+/.test(l))) {
-          return (
-            <View key={i} style={{ gap: 4 }}>
-              {lines.map((l, j) => (
-                <View key={j} style={{ flexDirection: "row", gap: 8 }}>
-                  <Text style={{ fontFamily: F.body, fontSize: size, lineHeight: size * 1.45, color: C.copper }}>{/^\s*\d/.test(l) ? l.match(/^\s*(\d+)/)![1] + "." : "•"}</Text>
-                  <Text style={{ flex: 1, fontFamily: F.body, fontSize: size, lineHeight: size * 1.45, color }}>{inline(l.replace(/^\s*([-*•]|\d+[.)])\s+/, ""), size)}</Text>
-                </View>
-              ))}
-            </View>
-          );
-        }
-        const heading = /^#{1,6}\s+(.*)$/.exec(b);
-        if (heading) return <Text key={i} style={{ fontFamily: F.bold, fontSize: size + 1, color: C.fg }}>{heading[1]}</Text>;
-        return <Text key={i} style={{ fontFamily: F.body, fontSize: size, lineHeight: size * 1.45, color }}>{inline(b.replace(/\n/g, " "), size)}</Text>;
+      {parse(text).map((b, i) => {
+        if (b.kind === "h") return <Text key={i} style={{ fontFamily: F.bold, fontSize: size + 1, lineHeight: (size + 1) * 1.4, color: C.fg, marginTop: i ? 4 : 0 }}>{inline(b.text, size)}</Text>;
+        if (b.kind === "code") return (
+          <View key={i} style={{ backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: C.edge }}>
+            <Text style={{ fontFamily: "Menlo", fontSize: size - 2, lineHeight: (size - 2) * 1.5, color: C.copper }}>{b.text}</Text>
+          </View>
+        );
+        if (b.kind === "list") return (
+          <View key={i} style={{ gap: 4 }}>
+            {b.items.map((l, j) => (
+              <View key={j} style={{ flexDirection: "row", gap: 8 }}>
+                <Text style={[body, { color: C.copper }]}>{/^\d/.test(l) ? l.match(/^(\d+)/)![1] + "." : "•"}</Text>
+                <Text style={[body, { flex: 1 }]}>{inline(l.replace(/^([-*•]|\d+[.)])\s+/, ""), size)}</Text>
+              </View>
+            ))}
+          </View>
+        );
+        return <Text key={i} style={body}>{inline(b.text, size)}</Text>;
       })}
     </View>
   );
 }
+
 function inline(s: string, size: number): React.ReactNode[] {
   const out: React.ReactNode[] = [];
-  const re = /\*\*(.+?)\*\*|`([^`]+)`/g;
+  const re = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(?<![\w*])\*([^*\n]+)\*(?![\w*])|(?<![\w_])_([^_\n]+)_(?![\w_])/g;
   let last = 0; let m: RegExpExecArray | null; let k = 0;
   while ((m = re.exec(s))) {
     if (m.index > last) out.push(s.slice(last, m.index));
     if (m[1]) out.push(<Text key={k++} style={{ fontFamily: F.bold }}>{m[1]}</Text>);
-    else out.push(<Text key={k++} style={{ fontFamily: "Menlo", fontSize: size - 1, color: C.copper }}>{m[2]}</Text>);
+    else if (m[2]) out.push(<Text key={k++} style={{ fontFamily: "Menlo", fontSize: size - 1, color: C.copper }}>{m[2]}</Text>);
+    else if (m[3]) out.push(<Text key={k++} style={{ color: C.teal, textDecorationLine: "underline" }} onPress={() => Linking.openURL(m![4]).catch(() => {})}>{m[3]}</Text>);
+    else out.push(m[5] ?? m[6]); // *emphasis*: the font has no italic, so just drop the marks
     last = m.index + m[0].length;
   }
   if (last < s.length) out.push(s.slice(last));
