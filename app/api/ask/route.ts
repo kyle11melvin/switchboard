@@ -9,8 +9,13 @@ export const dynamic = "force-dynamic";
 // The app's one call: a question in, progress out as newline-delimited JSON, ending with the top answer
 // and the cost. The gate in middleware.ts has already checked the bearer token.
 export async function POST(req: Request) {
-  const body = ((await req.json().catch(() => null)) ?? {}) as { question?: unknown; tier?: unknown };
+  const body = ((await req.json().catch(() => null)) ?? {}) as { question?: unknown; tier?: unknown; prior?: unknown };
   const question = typeof body.question === "string" ? body.question.trim().slice(0, 4000) : "";
+  // Earlier rounds of a follow-up: the last three, each trimmed, nothing else trusted from the phone.
+  const prior = (Array.isArray(body.prior) ? body.prior : [])
+    .filter((r: any) => r && typeof r.question === "string" && typeof r.answer === "string")
+    .slice(-3)
+    .map((r: any) => ({ question: r.question.trim().slice(0, 2000), answer: r.answer.trim().slice(0, 4000) }));
   if (!question) return NextResponse.json({ error: "Ask something first." }, { status: 400 });
   const tier = isTier(body.tier) ? body.tier : "standard";
   const who = (req.headers.get("x-device-id") || "anonymous").slice(0, 80);
@@ -26,7 +31,7 @@ export async function POST(req: Request) {
       const beat = setInterval(() => { try { controller.enqueue(enc.encode("\n")); } catch { /* closed */ } }, 8000);
       let answered = false;
       try {
-        const r = await ask({ question, tier, onEvent: (e) => { if (e.type === "answer") answered = true; send(e); } });
+        const r = await ask({ question, tier, prior, onEvent: (e) => { if (e.type === "answer") answered = true; send(e); } });
         if (!r.ok && !answered) await release(who);
         console.log(`[switchboard] ask ${tier} ${r.ok ? "ok" : "failed"} $${r.cost.usd} over ${r.cost.calls} calls`);
       } catch (e: any) {

@@ -8,7 +8,7 @@
 // top answer is a few sentences with the detail under "More", and its words stream as they are written.
 
 import { runText, runTextStream, providerStatus, type ProviderId, type RunResult } from "./providers";
-import { ROUTE_SYSTEM, routePrompt, BRIEF_SYSTEM, answerSystem, gradeSystem, writeSystem, judgeUserPrompt, writeUserPrompt, contextBlock, PHONE_BRIEF, PHONE_ANSWER, PHONE_WRITE } from "./prompts";
+import { ROUTE_SYSTEM, routePrompt, BRIEF_SYSTEM, answerSystem, gradeSystem, writeSystem, judgeUserPrompt, writeUserPrompt, contextBlock, PHONE_BRIEF, PHONE_ANSWER, PHONE_WRITE, FOLLOWUP_BRIEF, threadIdea, type PriorRound } from "./prompts";
 import { blind, unblind } from "./blind";
 import { measure } from "./measure";
 import { JOBS, jobById, guessJob } from "./jobs";
@@ -26,7 +26,7 @@ export type AskEvent =
   | { type: "done"; cost: { usd: number; calls: number; input: number; output: number; unpriced: string[] }; ms: number }
   | { type: "error"; stage: string; message: string };
 
-export interface AskInput { question: string; tier: Tier; onEvent: (e: AskEvent) => void }
+export interface AskInput { question: string; tier: Tier; prior?: PriorRound[]; onEvent: (e: AskEvent) => void } // prior: earlier rounds of this thread, oldest first
 
 function section(md: string, title: string): string {
   const m = new RegExp(`(^|\\n)##\\s*${title}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, "i").exec(md);
@@ -43,7 +43,7 @@ function liveBest(soFar: string): string {
   return body.trim();
 }
 
-export async function ask({ question, tier, onEvent }: AskInput): Promise<{ ok: boolean; cost: ReturnType<Tally["summary"]> }> {
+export async function ask({ question, tier, prior = [], onEvent }: AskInput): Promise<{ ok: boolean; cost: ReturnType<Tally["summary"]> }> {
   const t0 = Date.now();
   const def = tierDef(tier);
   const tally = new Tally();
@@ -63,9 +63,11 @@ export async function ask({ question, tier, onEvent }: AskInput): Promise<{ ok: 
   // brief. Neither needs the other, and running them together saves the slower of the two.
   const ais = [...configured].map((id) => ({ id, label: id, canImage: false }));
   const jobs = JOBS.map((j) => ({ id: j.id, label: j.label, use: j.use, models: def.answerers[j.id].map((s) => s.provider) }));
+  // A follow-up carries the earlier rounds into both, so "local only" routes and briefs as the full question.
+  const idea = threadIdea(prior, question);
   const [routed, sharpened] = await Promise.all([
-    call(brain, ROUTE_SYSTEM, routePrompt(question, jobs, ais, 0)),
-    call(brain, [BRIEF_SYSTEM, PHONE_BRIEF].join("\n\n"), `IDEA:\n${question}`),
+    call(brain, ROUTE_SYSTEM, routePrompt(idea, jobs, ais, 0)),
+    call(brain, [BRIEF_SYSTEM, PHONE_BRIEF, prior.length ? FOLLOWUP_BRIEF : ""].filter(Boolean).join("\n\n"), idea),
   ]);
 
   let job = jobById(guessJob(question))!;

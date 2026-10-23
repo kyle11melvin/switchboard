@@ -50,7 +50,7 @@ globalThis.fetch = async (url, opts = {}) => {
       const b = JSON.parse(opts.body); const content = b.messages[b.messages.length - 1].content;
       const parts = Array.isArray(content) ? content : [{ type: "text", text: content }];
       const text = parts.filter((c) => c.type === "text").map((c) => c.text).join("\n");
-      log({ who: "anthropic", model: b.model, images: parts.filter((c) => c.type === "image").length, system: b.system.slice(0, 40), phone: /READ ON A PHONE/.test(b.system), stream: Boolean(b.stream), text: text.slice(0, 600) });
+      log({ who: "anthropic", model: b.model, images: parts.filter((c) => c.type === "image").length, system: b.system.slice(0, 40), phone: /READ ON A PHONE/.test(b.system), followup: /THIS IS A FOLLOW-UP/.test(b.system), stream: Boolean(b.stream), text: text.slice(0, 600) });
       const answer = reply(b.system, text);
       if (!b.stream) return json({ content: [{ type: "text", text: answer }], model: b.model, usage: { input_tokens: 500, output_tokens: 200 } });
       // The streaming shape: the words in a few pieces, with the usage at the start and the end.

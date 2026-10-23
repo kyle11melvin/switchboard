@@ -46,6 +46,18 @@ Only if there is detail worth keeping: the figures, the sources, the one caveat 
 ## Built from
 As described above.`;
 
+// A follow-up: the person has a top answer and wants it narrowed, changed or taken further. The brief it
+// produces must stand alone, because the AIs that answer it never see the earlier round.
+export interface PriorRound { question: string; answer: string }
+
+export const FOLLOWUP_BRIEF = `THIS IS A FOLLOW-UP. The person already has a top answer (shown under EARLIER ROUNDS) and is now asking for something more, narrower or different. Write a brief for the follow-up that stands on its own: carry over the facts, place, numbers and constraints from the earlier question, say plainly what changed or what is being excluded, and ask only for what is new. Do not ask for the earlier answer again. If the follow-up is a short phrase ("local only", "cheaper", "in Spanish"), read it against the earlier question and spell it out.`;
+
+export function threadIdea(prior: PriorRound[], question: string): string {
+  if (!prior.length) return `IDEA:\n${question}`;
+  const rounds = prior.slice(-3).map((r, i) => `Question ${i + 1}: ${r.question}\nTop answer ${i + 1}: ${r.answer.slice(0, 1500)}`).join("\n\n");
+  return `EARLIER ROUNDS:\n${rounds}\n\nFOLLOW-UP (the idea to brief now):\n${question}`;
+}
+
 // House rules are personal to whoever runs the web tool (facts every AI must respect about them), so they
 // live in the environment, not in code: set HOUSE_RULES in Vercel. The app's pipeline never sends them.
 export const HOUSE_RULES = (process.env.HOUSE_RULES ?? "").trim();

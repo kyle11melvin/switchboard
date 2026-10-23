@@ -44,3 +44,19 @@ About 45 seconds, $0.106, and the answer fit one screen with "More" under it. Tw
 - The top answer said "I saw in late 2025" and "my knowledge may be outdated": the writer leaned on a
   model's memory over Perplexity's dated figures and spoke as "I". `PHONE_WRITE` now says to prefer a
   dated, cited figure and never write as "I".
+
+## Follow-ups
+
+Third real question ("best VA lender in San Antonio") and Kyle wanted to say "local only" and could
+not. Built the same afternoon:
+
+- The ask field returns under the top answer as "Ask a follow-up…". A follow-up runs the whole pipeline
+  again. The pick and the sharpen are handed the earlier rounds (`threadIdea` in `lib/prompts.ts`, last
+  three, trimmed) with `FOLLOWUP_BRIEF`, so "local only" becomes a brief that stands alone; the AIs
+  that answer never see the earlier round. Each round has its own "What was challenged" and cost, and
+  counts as a question.
+- Earlier rounds fold to a line above the current question; tap to read the answer. History keeps one
+  item per thread. "New question" starts over.
+- `app/api/ask` takes `prior: [{question, answer}]`, trusts nothing else from the phone.
+- Tests: 30 checks. Also fixed the harness so stopping the test server stops the `next-server` it spawned;
+  a leftover one on the port had a run talking to a stale build.

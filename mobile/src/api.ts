@@ -38,14 +38,16 @@ export async function saveSettings(s: Settings): Promise<void> {
 }
 
 // Ask one question. Events arrive as the server works; the promise settles when the stream ends.
-export async function ask(s: Settings, question: string, onEvent: (e: AskEvent) => void, signal?: AbortSignal): Promise<void> {
+export interface Prior { question: string; answer: string } // an earlier round of this thread, for a follow-up
+
+export async function ask(s: Settings, question: string, onEvent: (e: AskEvent) => void, signal?: AbortSignal, prior: Prior[] = []): Promise<void> {
   const url = s.url.replace(/\/$/, "") + "/api/ask";
   let res: Response;
   try {
     res = await streamingFetch(url, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${s.token}`, "x-device-id": s.deviceId },
-      body: JSON.stringify({ question, tier: s.tier }),
+      body: JSON.stringify({ question, tier: s.tier, prior }),
       signal,
     });
   } catch (e: any) {
@@ -73,7 +75,9 @@ export async function ask(s: Settings, question: string, onEvent: (e: AskEvent) 
 }
 
 // What the phone keeps: the last questions and their answers.
-export interface Saved { id: string; at: number; question: string; best: string; more?: string; checked: ProviderId[]; tags: Extract<AskEvent, { type: "challenged" }>["tags"]; agree: string; split: string; usd?: number }
+export interface Round { question: string; best: string; more?: string; checked: ProviderId[]; tags: Extract<AskEvent, { type: "challenged" }>["tags"]; agree: string; split: string; usd?: number }
+// One thread: the first question and its answer, then any follow-ups in order.
+export interface Saved extends Round { id: string; at: number; rounds?: Round[] }
 const HKEY = "sb.history";
 export async function loadHistory(): Promise<Saved[]> {
   try { const v = JSON.parse((await AsyncStorage.getItem(HKEY)) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }

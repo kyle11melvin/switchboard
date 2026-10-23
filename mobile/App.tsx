@@ -7,7 +7,7 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } f
 import * as Haptics from "expo-haptics";
 import { C, F, R, glow, type ProviderId } from "./src/theme";
 import { Bokeh, Button, Eyebrow, Glass, Links, Mark, Markdown, Shade, Tag, Word, colorOf, nameOf, rgba } from "./src/ui";
-import { ask, loadHistory, loadSettings, saveHistory, saveSettings, type AskEvent, type Saved, type Settings, type Tier } from "./src/api";
+import { ask, loadHistory, loadSettings, saveHistory, saveSettings, type AskEvent, type Round, type Saved, type Settings, type Tier } from "./src/api";
 
 type Phase = "idle" | "picking" | "answering" | "combining" | "answered" | "error";
 interface Ai { provider: ProviderId; model: string; status: "wait" | "done" | "failed"; text?: string; error?: string; citations?: string[] }
@@ -29,6 +29,9 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [question, setQuestion] = useState("");
   const [run, setRun] = useState<Run | null>(null);
+  const [rounds, setRounds] = useState<Round[]>([]); // earlier rounds of this thread, oldest first
+  const [threadId, setThreadId] = useState<string>("");
+  const [followUp, setFollowUp] = useState("");
   const [open, setOpen] = useState(false); // "what was challenged" fold (decision 2B)
   const [more, setMore] = useState(false); // the detail under the short answer
   const abort = useRef<AbortController | null>(null);
@@ -57,27 +60,37 @@ export default function App() {
     if (e.type === "error") setPhase("error");
   }, []);
 
-  async function send() {
-    const q = question.trim();
+  const roundOf = (r: Run): Round => ({ question: r.question, best: r.best ?? "", more: r.more, checked: r.checked ?? [], tags: r.tags ?? [], agree: r.agree ?? "", split: r.split ?? "", usd: r.usd });
+
+  // Ask a question. With `prior`, it is a follow-up: the earlier rounds go along so the brief can carry
+  // the facts over, and the finished round joins the thread.
+  async function start(q: string, prior: Round[]) {
     if (!q || !settings) return;
     if (!settings.token) { setShowSettings(true); return; }
-    setRun({ question: q, ais: [] }); setPhase("picking"); setOpen(false); setMore(false);
+    setRounds(prior); setRun({ question: q, ais: [] }); setPhase("picking"); setOpen(false); setMore(false); setFollowUp("");
     abort.current = new AbortController();
     try {
-      await ask(settings, q, onEvent, abort.current.signal);
+      await ask(settings, q, onEvent, abort.current.signal, prior.map((r) => ({ question: r.question, answer: r.more ? `${r.best}\n\n${r.more}` : r.best })));
     } catch (e: any) {
       setRun((r) => (r ? { ...r, error: e?.message ?? "Something went wrong." } : r)); setPhase("error");
     }
   }
-  // Keep the finished answer on the phone.
+  function send() { setThreadId(`${Date.now()}`); start(question.trim(), []); }
+  function sendFollowUp() { if (run?.best) start(followUp.trim(), [...rounds, roundOf(run)]); }
+
+  // Keep the finished thread on the phone: one history item per thread, updated as follow-ups land.
   useEffect(() => {
-    if (phase !== "answered" || !run?.best) return;
-    const item: Saved = { id: `${Date.now()}`, at: Date.now(), question: run.question, best: run.best, more: run.more, checked: run.checked ?? [], tags: run.tags ?? [], agree: run.agree ?? "", split: run.split ?? "", usd: run.usd };
-    setHistory((h) => { const next = [item, ...h.filter((x) => x.question !== item.question || x.best !== item.best)]; saveHistory(next); return next; });
+    if (phase !== "answered" || !run?.best || !threadId) return;
+    const item: Saved = { ...roundOf(run), id: threadId, at: Date.now(), rounds: rounds.length ? rounds : undefined };
+    setHistory((h) => { const next = [item, ...h.filter((x) => x.id !== threadId)]; saveHistory(next); return next; });
   }, [phase, run?.best]);
 
-  function reset() { abort.current?.abort(); setRun(null); setPhase("idle"); setQuestion(""); setOpen(false); setMore(false); }
-  function reopen(s: Saved) { setRun({ question: s.question, ais: [], best: s.best, more: s.more, checked: s.checked, tags: s.tags, agree: s.agree, split: s.split, usd: s.usd }); setPhase("answered"); setOpen(false); setMore(false); }
+  function reset() { abort.current?.abort(); setRun(null); setRounds([]); setThreadId(""); setPhase("idle"); setQuestion(""); setFollowUp(""); setOpen(false); setMore(false); }
+  function reopen(s: Saved) {
+    setThreadId(s.id); setRounds(s.rounds ?? []);
+    setRun({ question: s.question, ais: [], best: s.best, more: s.more, checked: s.checked, tags: s.tags, agree: s.agree, split: s.split, usd: s.usd });
+    setPhase("answered"); setOpen(false); setMore(false); setFollowUp("");
+  }
 
   if (!fontsReady || !settings) return <View style={{ flex: 1, backgroundColor: C.ground }} />;
   const mood = phase === "idle" ? "warm" : phase === "answered" ? "cool" : "mixed";
@@ -128,6 +141,9 @@ export default function App() {
               )}
             </View>
           )}
+
+          {/* earlier rounds of this thread, folded to a line each */}
+          {phase !== "idle" && rounds.map((r, i) => <Earlier key={i} round={r} />)}
 
           {/* the question, once asked */}
           {run && phase !== "idle" && (
@@ -233,7 +249,12 @@ export default function App() {
                 {run.tags && run.tags.length > 0 && <Button title={open ? "Hide what was challenged" : "What was challenged"} onPress={() => setOpen((v) => !v)} style={{ flex: 1.4 }} />}
               </View>
               {typeof run.usd === "number" && <Text style={[st.hint, { textAlign: "center" }]}>This question cost about ${run.usd.toFixed(3)} in model calls.</Text>}
-              <Button title="Next question" primary onPress={reset} style={{ marginTop: 6 }} />
+              <View style={[st.field, glow(C.copper, 22, 0.5), { marginTop: 6 }]}>
+                <TextInput value={followUp} onChangeText={setFollowUp} placeholder="Ask a follow-up…" placeholderTextColor={C.ph} multiline style={st.input} returnKeyType="default" />
+                <Pressable onPress={sendFollowUp} disabled={!followUp.trim()} style={[st.send, !followUp.trim() && { opacity: 0.5 }]}><Text style={{ color: C.copperInk, fontFamily: F.bold, fontSize: 20, marginTop: -2 }}>↑</Text></Pressable>
+              </View>
+              <Text style={[st.hint, { textAlign: "center" }]}>Narrow it, change it, or take it further. The AIs get the question so far.</Text>
+              <Button title="New question" onPress={reset} />
             </View>
           )}
 
@@ -250,6 +271,20 @@ export default function App() {
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
+  );
+}
+
+// An earlier round of the thread: the question on one line, the answer on tap.
+function Earlier({ round }: { round: Round }) {
+  const [show, setShow] = useState(false);
+  return (
+    <Pressable onPress={() => setShow((v) => !v)} style={st.earlier}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Text numberOfLines={show ? undefined : 1} style={{ flex: 1, fontFamily: F.medium, fontSize: 14, color: C.fg2 }}>{round.question}</Text>
+        <Text style={{ fontFamily: F.semi, fontSize: 11, color: C.muted }}>{show ? "hide" : "answer"}</Text>
+      </View>
+      {show && <View style={{ marginTop: 8 }}><Markdown text={round.best} size={14} color={C.fg2} /></View>}
+    </Pressable>
   );
 }
 
@@ -341,6 +376,7 @@ const st = StyleSheet.create({
   hintRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   hint: { fontFamily: F.body, fontSize: 12, color: C.muted },
   recent: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1, borderColor: C.edge, backgroundColor: C.glass2 },
+  earlier: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1, borderColor: rgba(C.teal, 0.35), backgroundColor: C.glass2 },
   bar: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 3 },
   ok: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#2FC48A", alignItems: "center", justifyContent: "center" },
