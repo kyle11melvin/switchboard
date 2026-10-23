@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Switchboard",
+    "slug": "switchboard",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "switchboard",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#070D19",
+    "splash": { "image": "./assets/splash-icon.png", "resizeMode": "contain", "backgroundColor": "#070D19" },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kylemelvin.switchboard",
+      "infoPlist": { "UIViewControllerBasedStatusBarAppearance": true }
+    },
+    "android": { "package": "com.kylemelvin.switchboard", "adaptiveIcon": { "foregroundImage": "./assets/icon.png", "backgroundColor": "#070D19" } },
+    "extra": { "apiUrl": "https://switchboard-two-puce.vercel.app" }
+  }
+}

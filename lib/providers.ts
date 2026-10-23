@@ -13,6 +13,19 @@ export interface RunResult {
   promptOnly?: boolean; // image mode, model can't draw: text is a prompt to paste elsewhere
   error?: string;
   ms: number;
+  usage?: { input: number; output: number }; // tokens, when the provider reports them
+}
+
+export interface RunOpts { model?: string } // ask for a specific model instead of the provider's default
+
+// Providers report tokens in different shapes; read whichever is there.
+function readUsage(data: any): { input: number; output: number } | undefined {
+  const u = data?.usage ?? data?.usageMetadata;
+  if (!u) return undefined;
+  const input = Number(u.input_tokens ?? u.prompt_tokens ?? u.promptTokenCount ?? 0);
+  const output = Number(u.output_tokens ?? u.completion_tokens ?? u.candidatesTokenCount ?? 0) + Number(u.thoughtsTokenCount ?? 0);
+  if (!input && !output) return undefined;
+  return { input, output };
 }
 
 interface ProviderDef {
@@ -150,7 +163,7 @@ async function openAICompatible(url: string, apiKey: string, model: string, syst
   const text: string = data?.choices?.[0]?.message?.content ?? "";
   const citations: string[] =
     data?.citations ?? data?.search_results?.map((r: any) => r.url).filter(Boolean) ?? [];
-  return { text, citations };
+  return { text, citations, usage: readUsage(data) };
 }
 
 // Perplexity's Agent API (POST /v1/agent). Searching the web is opt-in there, so it's asked for on every call.
@@ -178,26 +191,27 @@ async function perplexityAsk(apiKey: string, model: string, system: string, prom
     ? data.output_text
     : output.filter((i) => i?.type === "message").flatMap((i) => i.content ?? []).filter((c: any) => c?.type === "output_text").map((c: any) => c.text ?? "").join("");
   const citations: string[] = output.filter((i) => i?.type === "search_results").flatMap((i) => i.results ?? []).map((r: any) => r?.url).filter(Boolean);
-  return { text, citations, served: typeof data?.model === "string" ? data.model : undefined };
+  return { text, citations, served: typeof data?.model === "string" ? data.model : undefined, usage: readUsage(data) };
 }
 
 // `shown` lets the model look at pictures too. Perplexity's API only takes pictures as links, so it gets the words only.
-export async function runText(id: ProviderId, system: string, prompt: string, shown: Shown[] = []): Promise<RunResult> {
+export async function runText(id: ProviderId, system: string, prompt: string, shown: Shown[] = [], opts: RunOpts = {}): Promise<RunResult> {
   const t0 = Date.now();
-  let model = PROVIDERS[id].textModel();
+  let model = opts.model || PROVIDERS[id].textModel();
   try {
     let text = "";
     let citations: string[] = [];
+    let usage: RunResult["usage"];
     switch (id) {
       case "openai":
-        ({ text } = await openAICompatible("https://api.openai.com/v1/chat/completions", key(id), model, system, prompt, shown));
+        ({ text, usage } = await openAICompatible("https://api.openai.com/v1/chat/completions", key(id), model, system, prompt, shown));
         break;
       case "xai":
-        ({ text } = await openAICompatible("https://api.x.ai/v1/chat/completions", key(id), model, system, prompt, shown));
+        ({ text, usage } = await openAICompatible("https://api.x.ai/v1/chat/completions", key(id), model, system, prompt, shown));
         break;
       case "perplexity": {
         let served: string | undefined;
-        ({ text, citations, served } = await perplexityAsk(key(id), model, system, prompt));
+        ({ text, citations, served, usage } = await perplexityAsk(key(id), model, system, prompt));
         if (served) model = served; // a preset picks the model; show the one that answered
         break;
       }
@@ -217,14 +231,15 @@ export async function runText(id: ProviderId, system: string, prompt: string, sh
           },
         );
         text = (data?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
+        usage = readUsage(data);
         break;
       }
       case "gemini": {
         // Google sometimes says "high demand" on every call for one model while another answers at once.
         // After the retries fail, ask the fallback model instead so the card still gets an answer.
         const ask = (m: string) => postJSON(
-          `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key(id)}`,
-          {},
+          `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,
+          { "x-goog-api-key": key(id) },
           {
             ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
             contents: [{
@@ -245,11 +260,12 @@ export async function runText(id: ProviderId, system: string, prompt: string, sh
           model = fallback;
         }
         text = (data?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("");
+        usage = readUsage(data);
         break;
       }
     }
     if (!text) throw new Error("Empty response");
-    return { provider: id, model, text, citations: citations.length ? citations : undefined, ms: Date.now() - t0 };
+    return { provider: id, model, text, citations: citations.length ? citations : undefined, ms: Date.now() - t0, usage };
   } catch (e: any) {
     return { provider: id, model, error: e?.message ?? String(e), ms: Date.now() - t0 };
   }

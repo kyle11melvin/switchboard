@@ -40,6 +40,18 @@ Model IDs drift. Override without touching code:
 
 If a card shows a `404`/`model not found` error, that's the model ID — set the override to a current one.
 
+## The app (mobile/)
+
+The consumer product: one screen, built with Expo in the commercial's look. It calls one endpoint,
+`POST /api/ask`, which runs the whole pipeline (`lib/pipeline.ts`) and streams progress as newline-delimited
+JSON. See `CLAUDE.md` for the plan, the look and the settings.
+
+- Server side: set `ASK_TOKEN` in Vercel (any long random value) and redeploy. The middleware lets
+  `/api/ask` through with `Authorization: Bearer <that token>`.
+- Phone side: `cd mobile && npm install && npx expo start`, scan the QR code with Expo Go on an iPhone,
+  then in the app's Settings paste the server address and the token and pick a plan.
+- Tests: `npm run build && npm run test:ask` (no keys, no browser, no cost).
+
 ## Change something
 
 After results come back, the Improve button becomes **Change something**. It asks what you want changed; you answer in plain words. It may ask one or two short follow-up questions, then rewrites the brief from your idea, the brief that was sent, what each AI returned (including pictures), and your feedback. The new brief opens for editing, and Send starts the next round. Earlier rounds stay on screen, folded, for comparing. The AI chips still decide who the next round goes to. Code: `app/Revise.tsx`, `app/api/revise`, `REVISE_SYSTEM` in `lib/prompts.ts`.

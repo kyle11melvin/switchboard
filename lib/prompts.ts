@@ -29,19 +29,22 @@ Output ONLY the brief, in this shape (markdown, no preamble):
 
 Keep it under 200 words. Do not answer the idea yourself. IMAGE REQUESTS ARE DIFFERENT: if the idea is for an image, ignore the structure above and output ONLY the finished image-generation prompt itself (no headings, no labels, 60-140 words), because it is sent verbatim to the image model: aspect ratio first, then subject, composition, materials, lighting direction, lens/style, mood; quote any required text exactly and demand it be legible, else say "no text"; finish with an AVOID line. Follow any TEMPLATE supplied below.`;
 
-export const HOUSE_RULES = `HOUSE RULES (always apply): The person is a mortgage loan officer in Orange County, CA who is NOT a veteran — never write military-discount, "as a veteran myself", or personal military-service language on their behalf. Never promise rates, lock timing, approval, or savings. Any mortgage guidance must cite the governing source (HUD 4000.1, Fannie Mae Selling Guide, VA Pamphlet 26-7, or the Non-QM investor guideline) and say so when unsure rather than invent a section.`;
+// House rules are personal to whoever runs the web tool (facts every AI must respect about them), so they
+// live in the environment, not in code: set HOUSE_RULES in Vercel. The app's pipeline never sends them.
+export const HOUSE_RULES = (process.env.HOUSE_RULES ?? "").trim();
 
-export const ANSWER_SYSTEM_BASE = `You are one of several AI models answering the same brief independently; your answer will be compared side by side and graded. Be direct and specific. Lead with the answer. Keep it as short as it can be while still complete: no preamble, no recap, no closing remarks. If you are unsure of a fact, say so plainly rather than guessing — invented specifics will be flagged.\n\n${HOUSE_RULES}`;
+export const answerSystem = (houseRules: string) => `You are one of several AI models answering the same brief independently; your answer will be compared side by side and graded. Be direct and specific. Lead with the answer. Keep it as short as it can be while still complete: no preamble, no recap, no closing remarks. If you are unsure of a fact, say so plainly rather than guessing — invented specifics will be flagged.${houseRules ? `\n\n${houseRules}` : ""}`;
+export const ANSWER_SYSTEM_BASE = answerSystem(HOUSE_RULES);
 
 // Judging happens in two steps so the final answer is a real blend and not one answer lightly edited.
 // Step 1 grades the answers and lists the best parts of each. Step 2 writes the final answer from
 // that list alone: the writer never sees the original answers, so it can't copy one.
 
-export const GRADE_SYSTEM = `You are the gatekeeper. Several AI models answered the same brief. Your job is to protect the person from bad information, not to be polite to the models.
+export const gradeSystem = (houseRules: string) => `You are the gatekeeper. Several AI models answered the same brief. Your job is to protect the person from bad information, not to be polite to the models.
 
 The answers are anonymous and in random order, labelled Answer A, Answer B, and so on. You are not told which model wrote which, and one of them may be yours. Do not guess at authorship. Judge only what is written. Always refer to an answer by its full label, for example "Answer B".
 
-Grade every answer against (1) the brief, (2) the HOUSE RULES below, and (3) the project's LOCKED DECISIONS if any are supplied. A house-rule violation is always a red flag. Be specific and quote.\n\n${HOUSE_RULES}
+Grade every answer against (1) the brief, (2) the HOUSE RULES below if any, and (3) the project's LOCKED DECISIONS if any are supplied. A house-rule violation is always a red flag. Be specific and quote.${houseRules ? `\n\n${houseRules}` : ""}
 
 Output markdown in exactly this structure:
 
@@ -72,8 +75,9 @@ Work piece by piece, not answer by answer:
 
 Where exactness matters (code, numbers, names, guideline sections, citations) copy it in full. Leave out anything you flagged.
 End with a sub-heading "### Not used" listing any answer that contributed nothing, with the reason in a few words.`;
+export const GRADE_SYSTEM = gradeSystem(HOUSE_RULES);
 
-export const WRITE_SYSTEM = `You write the final answer to a brief. You have the brief and a list of the best parts from several anonymous answers, labelled Answer A, Answer B, and so on. You have not seen the answers themselves.
+export const writeSystem = (houseRules: string) => `You write the final answer to a brief. You have the brief and a list of the best parts from several anonymous answers, labelled Answer A, Answer B, and so on. You have not seen the answers themselves.
 
 Write a new answer that is better than any one of them could be. Draw on every answer that has something worth taking. Do not lean on a single answer when others offer something it lacks. Use your own judgment on order and wording, and keep the exact wording of a quoted line when it is already the best way to say it.
 
@@ -82,7 +86,7 @@ Rules:
 - Give ONE final answer, never a menu of options or versions. The brief may ask for "2-3 options": that instruction was for the models, to give you more to choose from. It does not apply to you. Choose or merge, and commit to one.
 - No preamble, no notes about tone or how to pick, no recap of what you did.
 - Never use anything listed under DO NOT USE.
-- Do not mention the answers or their labels inside the answer.\n\n${HOUSE_RULES}
+- Do not mention the answers or their labels inside the answer.${houseRules ? `\n\n${houseRules}` : ""}
 
 Output markdown in exactly this structure:
 
@@ -91,6 +95,7 @@ The final answer, complete and ready to use.
 
 ## Built from
 One short bullet per answer ("- **Answer A:** ...") naming the specific part you used from it, or "Nothing used" with the reason.`;
+export const WRITE_SYSTEM = writeSystem(HOUSE_RULES);
 
 export function judgeUserPrompt(brief: string, answers: { letter: string; text: string; citations?: string[] }[]) {
   const body = answers
@@ -124,7 +129,7 @@ Rules for the brief:
 - The models that receive it cannot see the earlier results or each other's work. "Keep Grok's layout" means nothing to them. Describe what to keep in plain, specific words: the layout, the colors, the wording, the parts.
 - Change what the person asked to change. Keep what they did not mention, unless it conflicts.
 - Fix plain defects you can see even if they only hinted at them (for example numbers written "$12.430.10" when "$12,430.10" is meant), and spell the correct form out exactly.
-- Do not add requirements they did not ask for.\n\n${HOUSE_RULES}`;
+- Do not add requirements they did not ask for.${HOUSE_RULES ? `\n\n${HOUSE_RULES}` : ""}`;
 
 export function reviseUserPrompt(input: {
   idea: string; brief: string; mode: string;

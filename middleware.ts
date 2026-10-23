@@ -8,6 +8,13 @@ export async function middleware(req: NextRequest) {
   if (!pw) return NextResponse.next();
   const { pathname } = req.nextUrl;
   if (pathname === "/login" || pathname === "/api/login") return NextResponse.next();
+  // The phone app has no cookie; it sends the ASK_TOKEN from Vercel's settings as a bearer token.
+  if (pathname === "/api/ask") {
+    const token = process.env.ASK_TOKEN;
+    const sent = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    if (token && sent && sameText(sent, token)) return NextResponse.next();
+    return NextResponse.json({ error: token ? "Wrong token" : "ASK_TOKEN is not set on the server" }, { status: 401 });
+  }
   const ok = sameText(req.cookies.get(AUTH_COOKIE)?.value ?? "", await sessionToken(pw));
   if (ok) return NextResponse.next();
   if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Not signed in" }, { status: 401 });

@@ -13,15 +13,19 @@ const json = (o) => new Response(JSON.stringify(o), { status: 200, headers: { "c
 // What each kind of text call gets back, told apart by the system prompt.
 function reply(system, user) {
   if (/decide where a request goes/.test(system)) {
-    // The pick step: a picture when there's a photo or a scene, research for questions, otherwise copy.
+    // The pick step: a picture when there's a photo or a scene, research for questions, otherwise the
+    // writing job. Job ids are read from the JOBS list in the prompt, so the web tool ("copy") and the
+    // app ("writing") both get an id that exists.
     const req = (/REQUEST:\n([\s\S]*?)(?:\n\n|$)/.exec(user) || [])[1] || "";
+    const ids = [...user.matchAll(/^- (\w+) \(/gm)].map((m) => m[1]);
     const photo = /\d photos? (is|are) attached/.test(req);
-    const job = photo || /\b(draw|picture|image|playing football)\b/i.test(req) ? "image" : /\b(best|what|how|which)\b/i.test(req) ? "research" : "copy";
-    const ais = job === "image" ? ["openai", "xai"] : ["openai", "anthropic", "xai"];
+    const want = photo || /\b(draw|picture|image|playing football)\b/i.test(req) ? "image" : /\b(best|what|how|which)\b/i.test(req) ? "research" : ids.includes("copy") ? "copy" : "writing";
+    const job = ids.includes(want) ? want : ids[0];
+    const ais = job === "image" ? ["openai", "xai"] : ["openai", "anthropic", "xai", "gemini", "perplexity"];
     return JSON.stringify({ job, ais, why: job === "image" ? "It asks for a picture." : "It's words for people to read." });
   }
   if (/rough idea into a tight brief/.test(system)) return "GOAL: " + user.split("\n").slice(-1)[0].slice(0, 80) + "\nDELIVERABLE: one short answer.";
-  if (/You are the gatekeeper/.test(system)) return "## Verdict\nAnswer B is best.\n\n## Scorecard\nA 7/10, B 9/10\n\n## Red flags\nNone.\n\n## Best parts\n- Answer A: the opening line.\n- Answer B: the numbers.";
+  if (/You are the gatekeeper/.test(system)) return "## Verdict\nAnswer B is best.\n\n## Scorecard\n| Model | Score /10 | Reason |\n|---|---|---|\n| Answer A | 6/10 | one unsupported claim |\n| Answer B | 9/10 | specific and sourced |\n| Answer C | 8/10 | solid |\n\n## Red flags\n- > \"Most apps are profitable within six months\" — Answer A — unverifiable claim, no source\n\n## Where they agree\nAll answers say to validate demand first.\n\n## Where they split\nAnswer A says ads first; Answer B says retention first, which is better supported.\n\n## Best parts\n- Answer A: the opening line.\n- Answer B: the numbers.\n\n### Not used\nNone.";
   if (/write the final answer to a brief/.test(system)) return "## Best combined answer\nThe top answer, built from the best parts.\n\n## Built from\nAnswer B 60%, Answer A 40%";
   if (/revise a brief/.test(system)) return /shorter|keep/i.test(user) ? "BRIEF: A revised brief that keeps what you liked." : "QUESTION: Shorter, or a different angle?";
   return "A short answer to: " + user.slice(0, 60);
@@ -46,8 +50,14 @@ globalThis.fetch = async (url, opts = {}) => {
       const b = JSON.parse(opts.body); const content = b.messages[b.messages.length - 1].content;
       const parts = Array.isArray(content) ? content : [{ type: "text", text: content }];
       const text = parts.filter((c) => c.type === "text").map((c) => c.text).join("\n");
-      log({ who: "anthropic", images: parts.filter((c) => c.type === "image").length, system: b.system.slice(0, 40), text: text.slice(0, 600) });
-      return json({ content: [{ type: "text", text: reply(b.system, text) }] });
+      log({ who: "anthropic", model: b.model, images: parts.filter((c) => c.type === "image").length, system: b.system.slice(0, 40), text: text.slice(0, 600) });
+      return json({ content: [{ type: "text", text: reply(b.system, text) }], model: b.model, usage: { input_tokens: 500, output_tokens: 200 } });
+    }
+    if (u.includes("generativelanguage.googleapis.com")) {
+      const b = JSON.parse(opts.body); const sys = b.systemInstruction?.parts?.map((p) => p.text).join("\n") || "";
+      const text = (b.contents?.[0]?.parts || []).map((p) => p.text || "").join("\n");
+      log({ who: "gemini", keyInHeader: Boolean(opts.headers?.["x-goog-api-key"]), text: text.slice(0, 600) });
+      return json({ candidates: [{ content: { parts: [{ text: reply(sys, text) }] } }], usageMetadata: { promptTokenCount: 400, candidatesTokenCount: 150 } });
     }
     if (u.includes("api.perplexity.ai/v1/agent")) {
       const b = JSON.parse(opts.body);
@@ -59,6 +69,7 @@ globalThis.fetch = async (url, opts = {}) => {
           { type: "search_results", results: [{ url: "https://example.com/source", title: "A source" }] },
           { type: "message", content: [{ type: "output_text", text: reply(b.instructions || "", text) }] },
         ],
+        usage: { input_tokens: 450, output_tokens: 180 },
       });
     }
     if (u.includes("/v1/chat/completions")) {
@@ -66,8 +77,8 @@ globalThis.fetch = async (url, opts = {}) => {
       const b = JSON.parse(opts.body); const sys = b.messages.find((m) => m.role === "system")?.content || "";
       const c = b.messages[b.messages.length - 1].content;
       const text = Array.isArray(c) ? c.filter((x) => x.type === "text").map((x) => x.text).join("\n") : String(c);
-      log({ who, images: Array.isArray(c) ? c.filter((x) => x.type === "image_url").length : 0, text: text.slice(0, 600) });
-      return json({ choices: [{ message: { content: reply(sys, text) } }], model: b.model });
+      log({ who, model: b.model, images: Array.isArray(c) ? c.filter((x) => x.type === "image_url").length : 0, text: text.slice(0, 600) });
+      return json({ choices: [{ message: { content: reply(sys, text) } }], model: b.model, usage: { prompt_tokens: 480, completion_tokens: 220 } });
     }
   } catch (e) {
     log({ who: "fake-error", url: u, error: String(e) });
