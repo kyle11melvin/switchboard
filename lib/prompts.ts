@@ -38,7 +38,7 @@ export const PHONE_ANSWER = `THIS WILL BE READ ON A PHONE. Keep the whole answer
 export const PHONE_WRITE = `THE ANSWER IS READ ON A PHONE SCREEN, so the structure above changes slightly:
 
 ## Best combined answer
-Only the answer itself, under 120 words, as plain sentences or one short list. No headings inside it. Someone should be able to read it in fifteen seconds and know what to do.
+Only the answer itself, under 120 words, as plain sentences or one short list. No headings inside it. Someone should be able to read it in fifteen seconds and know what to do. Prefer a dated figure from a cited source over any model's recollection. Never write as "I": no "I saw", "my knowledge", "I can't see live data". If the sources are thin, say "as of" the latest date they give and leave it there.
 
 ## More
 Only if there is detail worth keeping: the figures, the sources, the one caveat that matters, under 150 words. Leave this whole section out if it would only repeat the answer.
