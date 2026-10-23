@@ -14,7 +14,8 @@ export type AskEvent =
   | { type: "sharpened"; brief: string; asWritten: boolean }
   | { type: "answer"; provider: ProviderId; model: string; status: "done" | "failed"; text?: string; error?: string; citations?: string[]; ms: number }
   | { type: "challenged"; tags: { provider: ProviderId; tag: TagKind; label: string; score?: number; reason?: string }[]; agree: string; split: string; flags: number }
-  | { type: "answered"; best: string; builtFrom: string; measured: { name: string; percent: number }[]; fresh: number; checked: ProviderId[]; model: string; provider: ProviderId }
+  | { type: "writing"; best: string } // the top answer so far, while it is being written
+  | { type: "answered"; best: string; more: string; builtFrom: string; measured: { name: string; percent: number }[]; fresh: number; checked: ProviderId[]; model: string; provider: ProviderId }
   | { type: "done"; cost: { usd: number; calls: number; input: number; output: number; unpriced: string[] }; ms: number }
   | { type: "error"; stage: string; message: string };
 
@@ -72,7 +73,7 @@ export async function ask(s: Settings, question: string, onEvent: (e: AskEvent) 
 }
 
 // What the phone keeps: the last questions and their answers.
-export interface Saved { id: string; at: number; question: string; best: string; checked: ProviderId[]; tags: Extract<AskEvent, { type: "challenged" }>["tags"]; agree: string; split: string; usd?: number }
+export interface Saved { id: string; at: number; question: string; best: string; more?: string; checked: ProviderId[]; tags: Extract<AskEvent, { type: "challenged" }>["tags"]; agree: string; split: string; usd?: number }
 const HKEY = "sb.history";
 export async function loadHistory(): Promise<Saved[]> {
   try { const v = JSON.parse((await AsyncStorage.getItem(HKEY)) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }

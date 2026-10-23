@@ -14,7 +14,8 @@ interface Ai { provider: ProviderId; model: string; status: "wait" | "done" | "f
 interface Run {
   question: string; job?: string; why?: string; ais: Ai[]; brief?: string;
   tags?: Extract<AskEvent, { type: "challenged" }>["tags"]; agree?: string; split?: string; flags?: number;
-  best?: string; builtFrom?: string; checked?: ProviderId[]; usd?: number; error?: string;
+  draft?: string; // the top answer so far, while it is being written
+  best?: string; more?: string; builtFrom?: string; checked?: ProviderId[]; usd?: number; error?: string;
 }
 const ICON = require("./assets/hub.png");
 
@@ -29,6 +30,7 @@ export default function App() {
   const [question, setQuestion] = useState("");
   const [run, setRun] = useState<Run | null>(null);
   const [open, setOpen] = useState(false); // "what was challenged" fold (decision 2B)
+  const [more, setMore] = useState(false); // the detail under the short answer
   const abort = useRef<AbortController | null>(null);
 
   useEffect(() => { loadSettings().then((s) => { setSettings(s); if (!s.token) setShowSettings(true); }); loadHistory().then(setHistory); }, []);
@@ -42,7 +44,8 @@ export default function App() {
         case "sharpened": return { ...r, brief: e.brief };
         case "answer": return { ...r, ais: r.ais.map((a) => (a.provider === e.provider ? { ...a, status: e.status, text: e.text, error: e.error, citations: e.citations } : a)) };
         case "challenged": return { ...r, tags: e.tags, agree: e.agree, split: e.split, flags: e.flags };
-        case "answered": return { ...r, best: e.best, builtFrom: e.builtFrom, checked: e.checked };
+        case "writing": return { ...r, draft: e.best };
+        case "answered": return { ...r, best: e.best, more: e.more, builtFrom: e.builtFrom, checked: e.checked, draft: undefined };
         case "done": return { ...r, usd: e.cost.usd };
         case "error": return { ...r, error: e.message };
         default: return r;
@@ -58,7 +61,7 @@ export default function App() {
     const q = question.trim();
     if (!q || !settings) return;
     if (!settings.token) { setShowSettings(true); return; }
-    setRun({ question: q, ais: [] }); setPhase("picking"); setOpen(false);
+    setRun({ question: q, ais: [] }); setPhase("picking"); setOpen(false); setMore(false);
     abort.current = new AbortController();
     try {
       await ask(settings, q, onEvent, abort.current.signal);
@@ -69,12 +72,12 @@ export default function App() {
   // Keep the finished answer on the phone.
   useEffect(() => {
     if (phase !== "answered" || !run?.best) return;
-    const item: Saved = { id: `${Date.now()}`, at: Date.now(), question: run.question, best: run.best, checked: run.checked ?? [], tags: run.tags ?? [], agree: run.agree ?? "", split: run.split ?? "", usd: run.usd };
+    const item: Saved = { id: `${Date.now()}`, at: Date.now(), question: run.question, best: run.best, more: run.more, checked: run.checked ?? [], tags: run.tags ?? [], agree: run.agree ?? "", split: run.split ?? "", usd: run.usd };
     setHistory((h) => { const next = [item, ...h.filter((x) => x.question !== item.question || x.best !== item.best)]; saveHistory(next); return next; });
   }, [phase, run?.best]);
 
-  function reset() { abort.current?.abort(); setRun(null); setPhase("idle"); setQuestion(""); setOpen(false); }
-  function reopen(s: Saved) { setRun({ question: s.question, ais: [], best: s.best, checked: s.checked, tags: s.tags, agree: s.agree, split: s.split, usd: s.usd }); setPhase("answered"); setOpen(false); }
+  function reset() { abort.current?.abort(); setRun(null); setPhase("idle"); setQuestion(""); setOpen(false); setMore(false); }
+  function reopen(s: Saved) { setRun({ question: s.question, ais: [], best: s.best, more: s.more, checked: s.checked, tags: s.tags, agree: s.agree, split: s.split, usd: s.usd }); setPhase("answered"); setOpen(false); setMore(false); }
 
   if (!fontsReady || !settings) return <View style={{ flex: 1, backgroundColor: C.ground }} />;
   const mood = phase === "idle" ? "warm" : phase === "answered" ? "cool" : "mixed";
@@ -187,6 +190,12 @@ export default function App() {
                   <View style={[st.ok, glow(C.green, 12, 0.7)]}><Text style={{ color: C.greenInk, fontFamily: F.bold, fontSize: 15 }}>✓</Text></View>
                 </View>
                 <View style={{ marginTop: 10 }}><Markdown text={run.best} /></View>
+                {run.more ? (
+                  <Pressable onPress={() => setMore((v) => !v)} hitSlop={8} style={{ marginTop: 10 }}>
+                    <Text style={{ fontFamily: F.semi, fontSize: 13, color: C.teal }}>{more ? "Less" : "More"}</Text>
+                  </Pressable>
+                ) : null}
+                {more && run.more ? <View style={{ marginTop: 8 }}><Markdown text={run.more} size={14} color={C.fg2} /></View> : null}
                 <Text style={{ fontFamily: F.body, fontSize: 12, color: C.muted, marginTop: 10 }}>
                   {run.checked && run.checked.length > 1 ? `Checked against ${run.checked.map(nameOf).join(", ")}.` : "Only one AI answered, so it was not checked against another."}{run.flags ? ` ${run.flags} weak point${run.flags === 1 ? "" : "s"} caught.` : ""}
                 </Text>
@@ -214,7 +223,7 @@ export default function App() {
                 )}
               </Glass>
               <View style={{ flexDirection: "row", gap: 10 }}>
-                <Button title="Share" onPress={() => Share.share({ message: run.best! }).catch(() => {})} style={{ flex: 1 }} />
+                <Button title="Share" onPress={() => Share.share({ message: run.more ? `${run.best}\n\n${run.more}` : run.best! }).catch(() => {})} style={{ flex: 1 }} />
                 {run.tags && run.tags.length > 0 && <Button title={open ? "Hide what was challenged" : "What was challenged"} onPress={() => setOpen((v) => !v)} style={{ flex: 1.4 }} />}
               </View>
               {typeof run.usd === "number" && <Text style={[st.hint, { textAlign: "center" }]}>This question cost about ${run.usd.toFixed(3)} in model calls.</Text>}
@@ -258,16 +267,20 @@ function CombineView({ run, width }: { run: Run; width: number }) {
         {a && <Card ai={a} style={{ flex: 1 }} />}
         {b && <Card ai={b} style={{ flex: 1 }} />}
       </View>
-      <Glass color={rgba(C.copper, 0.75)} radius={20} style={[{ marginTop: 14, marginHorizontal: 24, alignItems: "center", gap: 10 }, glow(C.copper, 28, 0.6)]}>
+      <Glass color={rgba(run.draft ? C.teal : C.copper, 0.75)} radius={20} style={[{ marginTop: 14, marginHorizontal: run.draft ? 0 : 24, alignItems: "center", gap: 10 }, glow(run.draft ? C.teal : C.copper, 28, 0.6)]}>
         <Image source={ICON} style={[{ width: 60, height: 60, borderRadius: 15 }, glow(C.copper, 20, 0.6)]} />
         <View style={[st.rule, glow(C.copper, 8, 0.8)]} />
-        <View style={{ width: "100%", gap: 7 }}>
-          {[1, 0.86, 0.7, 0.92].map((w, i) => <View key={i} style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.26)", width: `${w * 100}%` }} />)}
-        </View>
+        {run.draft ? (
+          <View style={{ width: "100%" }}><Markdown text={run.draft} /></View>
+        ) : (
+          <View style={{ width: "100%", gap: 7 }}>
+            {[1, 0.86, 0.7, 0.92].map((w, i) => <View key={i} style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.26)", width: `${w * 100}%` }} />)}
+          </View>
+        )}
         <ActivityIndicator color={C.copper} />
       </Glass>
       {rest.map((ai) => <Card key={ai.provider} ai={ai} style={{ marginHorizontal: 36 }} />)}
-      <View style={{ marginTop: 20 }}><Word size={30} color={C.copper}>COMBINE.</Word><Text style={[st.hint, { marginTop: 6 }]}>Comparing the answers and writing one. About a minute.</Text></View>
+      <View style={{ marginTop: 20 }}><Word size={30} color={C.copper}>COMBINE.</Word><Text style={[st.hint, { marginTop: 6 }]}>{run.draft ? "Writing the top answer from the best parts." : "Comparing the answers, then writing one from the best parts."}</Text></View>
     </View>
   );
 }

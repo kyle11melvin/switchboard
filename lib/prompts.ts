@@ -29,6 +29,23 @@ Output ONLY the brief, in this shape (markdown, no preamble):
 
 Keep it under 200 words. Do not answer the idea yourself. IMAGE REQUESTS ARE DIFFERENT: if the idea is for an image, ignore the structure above and output ONLY the finished image-generation prompt itself (no headings, no labels, 60-140 words), because it is sent verbatim to the image model: aspect ratio first, then subject, composition, materials, lighting direction, lens/style, mood; quote any required text exactly and demand it be legible, else say "no text"; finish with an AVOID line. Follow any TEMPLATE supplied below.`;
 
+// The app's answers are read on a phone, so the pipeline (lib/pipeline.ts) adds these to the shared
+// instructions. The web tool never sends them: there, a long answer on a laptop is fine.
+export const PHONE_BRIEF = `THE ANSWER WILL BE READ ON A PHONE. Under Deliverable ask for the answer itself first, in under 120 words, then at most three short supporting points (figures, sources, the one caveat that matters). Never ask for a report, numbered sections, scenarios, or a full comparison; the person wants the answer, not a document.`;
+
+export const PHONE_ANSWER = `THIS WILL BE READ ON A PHONE. Keep the whole answer under 200 words: the answer first, in plain sentences, then only the few facts, figures or sources that back it up. No headings.`;
+
+export const PHONE_WRITE = `THE ANSWER IS READ ON A PHONE SCREEN, so the structure above changes slightly:
+
+## Best combined answer
+Only the answer itself, under 120 words, as plain sentences or one short list. No headings inside it. Someone should be able to read it in fifteen seconds and know what to do.
+
+## More
+Only if there is detail worth keeping: the figures, the sources, the one caveat that matters, under 150 words. Leave this whole section out if it would only repeat the answer.
+
+## Built from
+As described above.`;
+
 // House rules are personal to whoever runs the web tool (facts every AI must respect about them), so they
 // live in the environment, not in code: set HOUSE_RULES in Vercel. The app's pipeline never sends them.
 export const HOUSE_RULES = (process.env.HOUSE_RULES ?? "").trim();

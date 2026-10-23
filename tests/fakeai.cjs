@@ -26,7 +26,7 @@ function reply(system, user) {
   }
   if (/rough idea into a tight brief/.test(system)) return "GOAL: " + user.split("\n").slice(-1)[0].slice(0, 80) + "\nDELIVERABLE: one short answer.";
   if (/You are the gatekeeper/.test(system)) return "## Verdict\nAnswer B is best.\n\n## Scorecard\n| Model | Score /10 | Reason |\n|---|---|---|\n| Answer A | 6/10 | one unsupported claim |\n| Answer B | 9/10 | specific and sourced |\n| Answer C | 8/10 | solid |\n\n## Red flags\n- > \"Most apps are profitable within six months\" — Answer A — unverifiable claim, no source\n\n## Where they agree\nAll answers say to validate demand first.\n\n## Where they split\nAnswer A says ads first; Answer B says retention first, which is better supported.\n\n## Best parts\n- Answer A: the opening line.\n- Answer B: the numbers.\n\n### Not used\nNone.";
-  if (/write the final answer to a brief/.test(system)) return "## Best combined answer\nThe top answer, built from the best parts.\n\n## Built from\nAnswer B 60%, Answer A 40%";
+  if (/write the final answer to a brief/.test(system)) return "## Best combined answer\nThe top answer, built from the best parts.\n\n## More\nThe detail worth keeping.\n\n## Built from\nAnswer B 60%, Answer A 40%";
   if (/revise a brief/.test(system)) return /shorter|keep/i.test(user) ? "BRIEF: A revised brief that keeps what you liked." : "QUESTION: Shorter, or a different angle?";
   return "A short answer to: " + user.slice(0, 60);
 }
@@ -50,8 +50,18 @@ globalThis.fetch = async (url, opts = {}) => {
       const b = JSON.parse(opts.body); const content = b.messages[b.messages.length - 1].content;
       const parts = Array.isArray(content) ? content : [{ type: "text", text: content }];
       const text = parts.filter((c) => c.type === "text").map((c) => c.text).join("\n");
-      log({ who: "anthropic", model: b.model, images: parts.filter((c) => c.type === "image").length, system: b.system.slice(0, 40), text: text.slice(0, 600) });
-      return json({ content: [{ type: "text", text: reply(b.system, text) }], model: b.model, usage: { input_tokens: 500, output_tokens: 200 } });
+      log({ who: "anthropic", model: b.model, images: parts.filter((c) => c.type === "image").length, system: b.system.slice(0, 40), phone: /READ ON A PHONE/.test(b.system), stream: Boolean(b.stream), text: text.slice(0, 600) });
+      const answer = reply(b.system, text);
+      if (!b.stream) return json({ content: [{ type: "text", text: answer }], model: b.model, usage: { input_tokens: 500, output_tokens: 200 } });
+      // The streaming shape: the words in a few pieces, with the usage at the start and the end.
+      const pieces = answer.match(/[\s\S]{1,24}/g) || [];
+      const events = [
+        { type: "message_start", message: { usage: { input_tokens: 500 } } },
+        ...pieces.map((t) => ({ type: "content_block_delta", delta: { type: "text_delta", text: t } })),
+        { type: "message_delta", usage: { output_tokens: 200 } },
+        { type: "message_stop" },
+      ];
+      return new Response(events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join(""), { status: 200, headers: { "content-type": "text/event-stream" } });
     }
     if (u.includes("generativelanguage.googleapis.com")) {
       const b = JSON.parse(opts.body); const sys = b.systemInstruction?.parts?.map((p) => p.text).join("\n") || "";
