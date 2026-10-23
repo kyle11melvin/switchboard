@@ -34,3 +34,13 @@ showing. Both came from the same place: nothing in the chain said "this is a pho
 - The sharpen step no longer sees the job's note (it runs before the job is known). If briefs for code
   questions get vaguer, give the brief step a generic note instead.
 - Step 3 next: Supabase accounts, server-side history, RevenueCat.
+
+## Second run, same question
+
+About 45 seconds, $0.106, and the answer fit one screen with "More" under it. Two follow-ups shipped:
+
+- After the last AI lands, the brain grades for about 15 seconds with nothing on screen. The app now
+  shows "All in. Checking the answers against each other…" with a spinner under the bars.
+- The top answer said "I saw in late 2025" and "my knowledge may be outdated": the writer leaned on a
+  model's memory over Perplexity's dated figures and spoke as "I". `PHONE_WRITE` now says to prefer a
+  dated, cited figure and never write as "I".

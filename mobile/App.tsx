@@ -170,6 +170,12 @@ export default function App() {
                       </View>
                     ))}
                   </View>
+                  {run.ais.every((a) => a.status !== "wait") && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16, alignSelf: "flex-start" }}>
+                      <ActivityIndicator color={C.copper} size="small" />
+                      <Text style={{ fontFamily: F.semi, fontSize: 13, color: C.fg2 }}>All in. Checking the answers against each other…</Text>
+                    </View>
+                  )}
                   <View style={{ alignSelf: "flex-start", marginTop: 22 }}><Word size={26}>THE RIGHT <Text style={{ color: C.copper }}>AIs.</Text></Word></View>
                 </View>
               )}
